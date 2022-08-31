@@ -4,5 +4,4 @@ Data files and R scripts for bacterial community analysis of oyster larvae in re
 
 Software used for analysis : QIIME2 v2019.1; Rv 4.0.1
 
-To cite this work:
 
