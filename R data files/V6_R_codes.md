@@ -4,12 +4,15 @@
 ###### B. Taxonomy metadata 
 ###### C. Sample Metatable 
 
-#### Load the following libraries
+#### Install the packages
 ```
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 
 BiocManager::install(c("DESeq2","readxl","openxlsx","vegan","ggplot2","dplyr","tidyverse","phyloseq","gridExtra","grid","ggpubr","agricolae","microbiome","MicrobeR","microbiomeSeq","apeglm"))
+```
+#### Load the package libraries
+```
 library(DESeq2)
 library(readxl)
 library(openxlsx)
@@ -23,9 +26,6 @@ library(grid)
 library(ggpubr)
 library(agricolae)
 library(microbiome)
-#library(MicrobeR)
-library(pheatmap)
-library("apeglm")
 library(ranacapa)
 library(devtools)
 library(phylosmith)
@@ -37,16 +37,16 @@ library(MicrobiotaProcess)
 ```
 #### Load all the ASV counttables and metatable, taxonomy table and combine all into one big table in R
 ```
-setwd("~/Desktop/microbiome/VIMS16S/mvpics/tsv/new/")
+setwd("~/Desktop/microbiome_Analysis/")
 ```
-###### ASV Counttable
+###### ASV Count table
 ```
-abund_table <-read.xlsx("~/Documents/sequence/All_data.xlsx", sheet="table", rowNames = TRUE)
-abund_table<- as.data.frame(t(abund_table))
-abund_table1 <- cbind(SampleID = rownames(abund_table), abund_table)
-rownames(abund_table1) <- NULL
-abun_count <-gather(abund_table1, FeatureID, Value, ASV_1:ASV_4155)
-#add the rownames as a proper column
+ASV_table <-read.xlsx("~/Documents/sequence/All_data.xlsx", sheet="table", rowNames = TRUE)
+ASV_table<- as.data.frame(t(ASV_table))
+ASV_table1 <- cbind(SampleID = rownames(ASV_table), ASV_table)
+rownames(ASV_table1) <- NULL
+ASV_count <-gather(ASV_table1, FeatureID, Value, ASV_1:ASV_4155)
+
 ```
 ###### Metatable
 ```
@@ -55,8 +55,8 @@ meta_table1 <- cbind(SampleID = rownames(meta_table ), meta_table)
 rownames(meta_table1 ) <- NULL
 meta_table1$Treatment <- as.character(meta_table1$Treatment)
 meta_table1$Treatment <- factor(meta_table1$Treatment, levels=unique(meta_table1$Treatment))
-meta_table1$ProjectName <- as.character(meta_table1$ProjectName)
-meta_table1$Tanksystem <- factor(meta_table1$ProjectName, levels=unique(meta_table1$ProjectName))
+meta_table1$Trial <- as.character(meta_table1$Trial)
+meta_table1$Trial <- factor(meta_table1$Trial, levels=unique(meta_table1$Trial))
 ```
 ###### Read the taxonomy table
 ```
@@ -68,25 +68,25 @@ taxa_A <- as.data.frame(tax_table1)
 taxa_A1  <- cbind(FeatureID = rownames(taxa_A ), taxa_A)
 rownames(taxa_A1) <- NULL
 ```
-#### Convert data to a phyloseq object
+#### Convert all the data to a phyloseq object
 ```
-Abund_table<- as.data.frame(t(abund_table))
-A2 <-as.matrix(Abund_table)
+Abund_table<- as.data.frame(t(ASV_table))
+Phyloseq_table <-as.matrix(ASV_table)
 # First we need to create a phyloseq object using our un-transformed count table
-count_tab_pyA <- otu_table(A2, taxa_are_rows=T)
+count_tab_phy <- otu_table(Phyloseq_table, taxa_are_rows=T)
 # Read in the taxonomy 
 taxa_A2 <-taxa_A1 %>% remove_rownames %>% column_to_rownames(var="FeatureID")
 taxa_A2 <-as.matrix(taxa_A2)
 tax_tab_phy <- tax_table(taxa_A2)
 # Read in the metatable
 meta_table2 <-Meta_T %>% remove_rownames %>% column_to_rownames(var="SampleID")
-sample_info_tab_phy <- sample_data(meta_table2)
-All_S4 <-phyloseq(count_tab_pyA, tax_tab_phy, sample_info_tab_phy)
-All_S4
+metatable_tab_phy <- sample_data(meta_table2)
+Phy<-phyloseq(count_tab_phy, tax_tab_phy, metatable_tab_phy)
+Phy
 ```
 #### Remove any taxa associated with chloroplast and mitochondria
 ```
-justbacteria <- All_S4_prune %>%
+Phy_bacteria <- All_S4 %>%
   subset_taxa(
     Kingdom == "Bacteria" &                   
       Family  != "mitochondria" &           
@@ -98,50 +98,55 @@ justbacteria <- All_S4_prune %>%
 
 #### Join all the data together into a one file
 ```
-sample_sum_df <- data.frame(sum = sample_sums(justbacteria ))
+# Extract the sample reads from phyloseq object
+sample_sum_df <- data.frame(sum = sample_sums(Phy_bacteria ))
 sum(sample_sum_df[, 'sum'])
 Sample_reads <- cbind(SampleID = rownames(sample_sum_df), sample_sum_df)
 rownames(Sample_reads) <- NULL
+
 #Join all the data
 Meta_T <-full_join(meta_table1, Sample_reads)
-M1count<-full_join(taxa_A1, abun_count)
-combine_b <-full_join(M1count,Meta_T)
+M1count<-full_join(taxa_A1, ASV_count)
+combine_all <-full_join(M1count,Meta_T)
 All_samples <- combine_b%>% group_by(SampleID,Order,Treatment)%>%summarise(avg_abundance = mean(sum))
 ```
 #### Basic Statistics
 ```
-newdata <-combine_b %>% group_by(SampleID,FeatureID) %>% summarise(Value=mean(Value))
-newdata1 <-spread(newdata, SampleID, Value) ##spread the data into a wide format
-x<-dim(newdata1)[2] # number of columns
-newdata1[2:x] <- lapply(newdata1[2:x], function(x) as.numeric(as.character(x)))
+data <-combine_all %>% group_by(SampleID,FeatureID) %>% summarise(Value=mean(Value))
+##spread the data into a wide format
+data1 <-spread(data, SampleID, Value) 
+# number of columns
+x<-dim(data1)[2] 
+data1[2:x] <- lapply(data1[2:x], function(x) as.numeric(as.character(x)))
 ```
 
 #### Get basic stats and generate a table called "dataset_info"
 ```
-seq_total<-apply(newdata1[2:x],2,sum) #number of sequences per sample
-ASV_count<-colSums(newdata1[2:x]>0) # OTUs per sample
-ASV_single<-colSums(newdata1[2:x]==1) # OTUs with only 1 seq
-ASV_double<-colSums(newdata1[2:x]==2) # OTUs that have only 2 seqs
-ASV_true<-colSums(newdata1[2:x]>2) # Number of OTUs with >2 seqs
-dataset_info<-data.frame(seq_total,ASV_count)
-#add the rownames as a proper column
+Total_sequence <-apply(data1[2:x],2,sum) #number of sequences per sample
+ASV_count<-colSums(data1[2:x]>0) # OTUs per sample
+ASV_single<-colSums(data1[2:x]==1) # OTUs with only 1 seq
+ASV_double<-colSums(data1[2:x]==2) # OTUs that have only 2 seqs
+ASV_true<-colSums(data1[2:x]>2) # Number of OTUs with >2 seqs
+dataset_info<-data.frame(Total_sequence,ASV_count)
+
 dataset_info <- cbind(SampleID = rownames(dataset_info), dataset_info)
 dataset_info
 rownames(dataset_info) <- NULL
+
 #combine the metadata with dataset_info
 data_meta <- meta_table1 [c(1,2,4)]
 basic_stat <- full_join(data_meta, dataset_info)
 basic_stat
+#Write table to file
 #write.csv(basic_stat,"basic_stat.csv")
 ``` 
 #### Subset data by larvae
 ```
-phy <- subset_samples(justbacteria, Sym=="Y")
-phy <- subset_samples(justbacteria, All=="IN")
-Table1 <- otu_table(phy)
-SD <- sample_data(phy) %>%
+Larvae <- subset_samples(Phy_bacteria, Larvae=="Y")
+Table1 <- otu_table(Larvae)
+SD <- sample_data(Larvae) %>%
     data.frame() %>%
-    select("Treatment","Hatchery", "Year","Month","Season","season","ProjectName", "Num","Type", "Name","All","TankLocation","Location","Env") %>%
+    select("Treatment","Hatchery", "Year","Month","Season","season","Trial", "Trial_Number","Type", "Name","All","Tank_Replicate","Location","Env") %>%
     mutate_if(is.factor,as.character)
 SD1 <- cbind(SampleID = rownames(SD ), SD)
 rownames(SD1 ) <- NULL
