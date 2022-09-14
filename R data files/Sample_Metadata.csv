@@ -1,4 +1,4 @@
-#SampleID,SampleName,ProjectName,Treatment,SampleNumber,TankLocation,SampleType,Type,Num,Name,Hatchery,Year,Month,Season,season,Location
+#SampleID,SampleName,Trial,Treatment,SampleNumber,Tank_Replicate,SampleType,Type,Num,Name,Hatchery,Year,Month,Season,season,Location
 RS301_S17,VIMS1_CONA_1,T1,C,1,A,larvae,UV,1,T1,VIMS,2019,June,Summer,May_June_July,Virginia
 RS302_S29,VIMS1_CONA_2,T1,C,2,A,larvae,UV,1,T1,VIMS,2019,June,Summer,May_June_July,Virginia
 RS303_S41,VIMS1_CONA_3,T1,C,3,A,larvae,UV,1,T1,VIMS,2019,June,Summer,May_June_July,Virginia
