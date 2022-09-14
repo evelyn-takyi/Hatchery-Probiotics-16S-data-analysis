@@ -142,11 +142,11 @@ basic_stat
 ``` 
 #### Subset data by larvae
 ```
-Larvae <- subset_samples(Phy_bacteria, Larvae=="Y")
+Larvae <- subset_samples(Phy_bacteria, SampleType=="Larvae")
 Table1 <- otu_table(Larvae)
 SD <- sample_data(Larvae) %>%
     data.frame() %>%
-    select("Treatment","Hatchery", "Year","Month","Season","season","Trial", "Trial_Number","Type", "Name","All","Tank_Replicate","Location","Env") %>%
+    select("Treatment","Hatchery", "Year","Month","Season","season", "Trial", "Trial_Number","Water_Type", "Name","Tank_Replicate","Location") %>%
     mutate_if(is.factor,as.character)
 SD1 <- cbind(SampleID = rownames(SD ), SD)
 rownames(SD1 ) <- NULL
@@ -157,23 +157,23 @@ sum(sample_sum_df[, 'sum'])
 ##### Step1. Evaluate Amplicon Sequence Variants (ASV) summary statistics
 #####  Remove taxa with zero counts 
 ```
-summary(taxa_sums(justbacteria))
-phy <- prune_taxa(taxa_sums(justbacteria) > 0, justbacteria)
+summary(taxa_sums(Phy_bacteria))
+phy <- prune_taxa(taxa_sums(Phy_bacteria) > 0, Phybacteria)
 ```
 #### Step2. Factor reordering and renaming
 ##### Reorder Trials
 ```
 levels(sample_data(phy)$Trial)
-sample_data(phy)$Trial <- factor(sample_data(phy)$Trial, levels = c("T6","T8"))
+sample_data(phy)$Trial <- factor(sample_data(phy)$Trial, levels = c("T1", T2", "T3", "T4", "T5", "T6", "T7","T8"))
 levels(sample_data(phy)$Trial)
 
 # Relabel Water Type
-sample_data(phy)$Water <- factor(sample_data(phy)$Water, labels = c("T6NUV","T6UV","T8NUV","T8UV"))
-levels(sample_data(phy)$Water)
+sample_data(phy)$WaterType <- factor(sample_data(phy)$WaterType, labels = c("T1", T2", "T3", "T4", "T5", "T6", "T7","T8NUV","T8UV"))
+levels(sample_data(phy)$WaterType)
 
 # Reorder Hatchery labels
 levels(sample_data(phy)$Hatchery)
-sample_data(phy)$Hatchery <- factor(sample_data(phy)$Hatchery, levels = c("MOOK", "RWU"))
+sample_data(phy)$Hatchery <- factor(sample_data(phy)$Hatchery, levels = c("VIMS", "MAT", "MOOK", "RWU"))
 levels(sample_data(phy)$Hatchery)
 
 # Create a new data frame of the sorted row sums, a column of sorted values from 1 to the total number of individuals/counts for each ASV and a categorical variable stating these are all ASVs.
