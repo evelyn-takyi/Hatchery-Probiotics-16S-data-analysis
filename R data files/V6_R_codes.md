@@ -83,23 +83,13 @@ meta_table2 <-Meta_T %>% remove_rownames %>% column_to_rownames(var="SampleID")
 metatable_tab_phy <- sample_data(meta_table2)
 Phy<-phyloseq(count_tab_phy, tax_tab_phy, metatable_tab_phy)
 Phy
-```
-#### Remove any taxa associated with chloroplast and mitochondria
-```
-Phy_bacteria <- All_S4 %>%
-  subset_taxa(
-    Kingdom == "Bacteria" &                   
-      Family  != "mitochondria" &           
-      Class   != "Chloroplast" &
-      Order   != "mitochondria" &
-      Order   != "Chloroplast"
-  )
+
 ```
 
 #### Join all the data together into a one file
 ```
 # Extract the sample reads from phyloseq object
-sample_sum_df <- data.frame(sum = sample_sums(Phy_bacteria ))
+sample_sum_df <- data.frame(sum = sample_sums(Phy ))
 sum(sample_sum_df[, 'sum'])
 Sample_reads <- cbind(SampleID = rownames(sample_sum_df), sample_sum_df)
 rownames(Sample_reads) <- NULL
@@ -142,45 +132,44 @@ basic_stat
 ``` 
 #### Subset data by larvae
 ```
-Larvae <- subset_samples(Phy_bacteria, SampleType=="Larvae")
-Table1 <- otu_table(Larvae)
-SD <- sample_data(Larvae) %>%
+Phy_Larvae <- subset_samples(Phy, SampleType=="Larvae")
+Table1 <- otu_table(Phy_Larvae)
+SD <- sample_data(Phy_Larvae) %>%
     data.frame() %>%
     select("Treatment","Hatchery", "Year","Month","Season","season", "Trial", "Trial_Number","Water_Type", "Name","Tank_Replicate","Location") %>%
     mutate_if(is.factor,as.character)
 SD1 <- cbind(SampleID = rownames(SD ), SD)
 rownames(SD1 ) <- NULL
-sample_sum_df <- data.frame(sum = sample_sums(ps2 ))
-sum(sample_sum_df[, 'sum'])
+
 ```
 #### Data Filtering
 ##### Step1. Evaluate Amplicon Sequence Variants (ASV) summary statistics
 #####  Remove taxa with zero counts 
 ```
-summary(taxa_sums(Phy_bacteria))
-phy <- prune_taxa(taxa_sums(Phy_bacteria) > 0, Phybacteria)
+summary(taxa_sums(Phy_Larvae))
+Phy_Larvae_0 <- prune_taxa(taxa_sums(Phy_Larvae) > 0, Phy_Larvae)
 ```
 #### Step2. Factor reordering and renaming
 ##### Reorder Trials
 ```
-levels(sample_data(phy)$Trial)
-sample_data(phy)$Trial <- factor(sample_data(phy)$Trial, levels = c("T1", T2", "T3", "T4", "T5", "T6", "T7","T8"))
-levels(sample_data(phy)$Trial)
+levels(sample_data(Phy_Larvae_0)$Trial)
+sample_data(Phy_Larvae_0)$Trial <- factor(sample_data(Phy_Larvae_0)$Trial, levels = c("T1", T2", "T3", "T4", "T5", "T6", "T7","T8"))
+levels(sample_data(Phy_Larvae_0)$Trial)
 
 # Relabel Water Type
-sample_data(phy)$WaterType <- factor(sample_data(phy)$WaterType, labels = c("T1", T2", "T3", "T4", "T5", "T6", "T7","T8NUV","T8UV"))
-levels(sample_data(phy)$WaterType)
+sample_data(Phy_Larvae_0)$Name <- factor(sample_data(Phy_Larvae_0)$Name, labels = c("T1", T2", "T3", "T4", "T5", "T6", "T7","T8NUV","T8UV"))
+levels(sample_data(Phy_Larvae_0)$Name)
 
 # Reorder Hatchery labels
-levels(sample_data(phy)$Hatchery)
-sample_data(phy)$Hatchery <- factor(sample_data(phy)$Hatchery, levels = c("VIMS", "MAT", "MOOK", "RWU"))
-levels(sample_data(phy)$Hatchery)
+levels(sample_data(Phy_Larvae_0)$Hatchery)
+sample_data(Phy_Larvae_0)$Hatchery <- factor(sample_data(Phy_Larvae_0)$Hatchery, levels = c("VIMS", "MAT", "MOOK", "RWU"))
+levels(sample_data(Phy_Larvae_0)$Hatchery)
 
 # Create a new data frame of the sorted row sums, a column of sorted values from 1 to the total number of individuals/counts for each ASV and a categorical variable stating these are all ASVs.
-readsumsdf <- data.frame(nreads = sort(taxa_sums(phy), decreasing = TRUE), 
-                        sorted = 1:ntaxa(phy), type = "ASVs")
+readsumsdf <- data.frame(nreads = sort(taxa_sums(Phy_Larvae_0), decreasing = TRUE), 
+                        sorted = 1:ntaxa(Phy_Larvae_0), type = "ASVs")
 # Make a data frame with a column for the read counts of each sample for histogram production
-sample_sum_df <- data.frame(sum = sample_sums(phy))
+sample_sum_df <- data.frame(sum = sample_sums(Phy_Larvae_0))
 ```
 
 #### Step3. Make plots for number of reads
@@ -193,22 +182,12 @@ p.reads = ggplot(readsumsdf, aes(x = sorted, y = nreads)) +
   facet_wrap(~type, scales = "free") +
   ylab("# of Sequences")
  ``` 
-###### Generates a second bar plot with # of reads (y-axis) per sample at various read depths. Sorted from most to least
-```
-p.reads.hist <- ggplot(sample_sum_df, aes(x = sum)) + 
-  geom_histogram(color = "black", fill = "firebrick3", binwidth = 150) +
-  ggtitle("Distribution of sample sequencing depth") + 
-  xlab("Read counts") +
-  ylab("# of Samples")
-# Final plot, side-by-side
-grid.arrange(p.reads, p.reads.hist, ncol = 2)
-```
 
 #### Step 4: Detect and remove outlier samples
 ##### Format a data table to combine sample summary data with sample variable data
 ```
-ss <- sample_sums(phy)
-sd <- as.data.frame(sample_data(phy))
+ss <- sample_sums(Phy_Larvae_0)
+sd <- as.data.frame(sample_data(Phy_Larvae_0))
 ss.df <- merge(sd, data.frame("ASV" = ss), by ="row.names")
 # Plot the data by the treatment variable
 y = 10000 # Set a threshold for the minimum number of acceptable reads. 
@@ -225,88 +204,68 @@ p.ss.boxplot
 ```
 ###### Remove samples that are outliers
 ```
-nsamples(phy)
-ps1 <- phy2 %>% subset_samples(SampleName != "VIMS4_S4A_3" & SampleName != "UVL_S4A_3"& SampleName != "VIMS1_CONA_1")
-nsamples(ps1)
+nsamples(Phy_Larvae_0)
+Phy1 <- Phy_Larvae_0 %>% subset_samples(SampleName != "VIMS4_S4A_3" & SampleName != "UVL_S4A_3"& SampleName != "VIMS1_CONA_1")
+nsamples(Phy1)
 ```
 
 #### Step 5: Taxon cleaning
 ###### The following R chunk removes taxa not-typically part of a bacterial microbiome analysis.
 ```
-get_taxa_unique(phy, "Kingdom")
-get_taxa_unique(phy, "Class")
+get_taxa_unique(phy1, "Kingdom")
+get_taxa_unique(phy1, "Class")
 phy # Check the number of taxa prior to removal
-ntaxa(phy)
-ps2 <- phy %>%
+ntaxa(phy1)
+Phy2 <- phy1 %>%
   subset_taxa(
     Kingdom == "Bacteria" &
     Family  != "mitochondria" &
     Class   != "Chloroplast" &
     Phylum != "Cyanobacteria/Chloroplast"
   )
-ps2 # Confirm that the taxa were removed
-get_taxa_unique(ps2, "Kingdom")
-get_taxa_unique(ps2, "Class")
-get_taxa_unique(ps2, "Phylum")
+# Confirm that the taxa were removed
+get_taxa_unique(Phy2, "Kingdom")
+get_taxa_unique(Phy2, "Class")
+get_taxa_unique(Phy2, "Phylum")
 ```
 #### Step 6: Data Subsetting
 ###### All samples
 ```
-ntaxa(ps2)
-ps2 <- prune_taxa(taxa_sums(ps2) > 0, ps2)
-ntaxa(ps2)
 # Trial1
-ps2.T1 <- subset_samples(ps2, ProjectName == "T1")
-any(taxa_sums(ps2.T1) == 0) # In this case it is TRUE, so remove the zero's
-ps2.T1 <- prune_taxa(taxa_sums(ps2.T1) > 0, ps2.T1)
-any(taxa_sums(ps2.T1) == 0) # It should now be false
+Phy2.T1 <- subset_samples(Phy2, Trial == "T1")
+
 # Trial2
-ps2.T2 <- subset_samples(ps2, ProjectName == "T2")
-any(taxa_sums(ps2.T2) == 0) # In this case it is TRUE, so remove the zero's
-ps2.T2 <- prune_taxa(taxa_sums(ps2.T2) > 0, ps2.T2)
-any(taxa_sums(ps2.T2) == 0) # It should now be false
+Phy2.T2 <- subset_samples(Phy2, Trial == "T2")
+
 # Trial3
-ps2.T3 <- subset_samples(ps2, ProjectName == "T3")
-any(taxa_sums(ps2.T3) == 0) # In this case it is TRUE, so remove the zero's
-ps2.T3 <- prune_taxa(taxa_sums(ps2.T3) > 0, ps2.T3)
-any(taxa_sums(ps2.T3) == 0) # It should now be false
+Phy2.T3 <- subset_samples(Phy2, Trial == "T3")
+
 # Trial4
-ps2.T4 <- subset_samples(ps2, ProjectName == "T4")
-any(taxa_sums(ps2.T4) == 0) # In this case it is TRUE, so remove the zero's
-ps2.T4 <- prune_taxa(taxa_sums(ps2.T4) > 0, ps2.T4)
-any(taxa_sums(ps2.T4) == 0) # It should now be false
+Phy2.T4 <- subset_samples(Phy2, Trial == "T4")
+
 # Trial5
-ps2.T5 <- subset_samples(ps2, ProjectName == "T5")
-any(taxa_sums(ps2.T5) == 0) # In this case it is TRUE, so remove the zero's
-ps2.T5 <- prune_taxa(taxa_sums(ps2.T5) > 0, ps2.T5)
-any(taxa_sums(ps2.T5) == 0) # It should now be false
+Phy2.T5 <- subset_samples(Phy2, Trial == "T5")
+
 # Trial6
-ps2.T6 <- subset_samples(ps2, Name == "T6")
-any(taxa_sums(ps2.T6) == 0) # In this case it is TRUE, so remove the zero's
-ps2.T6 <- prune_taxa(taxa_sums(ps2.T6) > 0, ps2.T6)
-any(taxa_sums(ps2.T6) == 0) # It should now be false
+Phy2.T6 <- subset_samples(Phy2, Trial == "T6")
+
 # Trial7
-ps2.T7 <- subset_samples(ps2, Name == "T7")
-any(taxa_sums(ps2.T7) == 0) # In this case it is TRUE, so remove the zero's
-ps2.T7 <- prune_taxa(taxa_sums(ps2.T7) > 0, ps2.T7)
-any(taxa_sums(ps2.T7) == 0) # It should now be false
+Phy2.T7 <- subset_samples(Phy2, Trial == "T7")
+
 # Trial8
-ps2.T8 <- subset_samples(ps2, Name == "T8NUV")
-any(taxa_sums(ps2.T8) == 0) # In this case it is TRUE, so remove the zero's
-ps2.T8 <- prune_taxa(taxa_sums(ps2.T8) > 0, ps2.T8)
-any(taxa_sums(ps2.T8) == 0) # It should now be false
+Phy2.T8 <- subset_samples(Phy2, Trial == "T8")
 ```
 ###### Taxa Prevalence estimation
 ```
-# Calculate ASVs  prevalence across the data set
-prevdf <- apply(X = otu_table(ps2),MARGIN = ifelse(taxa_are_rows(ps2), yes = 1, no = 2),FUN = function(x){sum(x > 0)})
+# Identify taxa that are prevalent across the data set
+Taxa_Prev <- apply(X = otu_table(Phy2),MARGIN = ifelse(taxa_are_rows(Phy2), yes = 1, no = 2),FUN = function(x){sum(x > 0)})
 # Add taxonomy and total read counts to prevdf
-prevdf <- data.frame(Prevalence = prevdf, TotalAbundance = taxa_sums(ps2), tax_table(ps2))
+Taxa_Prev <- data.frame(Prevalence = Taxa_Prev, TotalAbundance = taxa_sums(Phy2), tax_table(Phy2))
 ```
 ###### Taxa Prevalence plot
 ```
-prevdf1 <- subset(prevdf, Phylum %in% get_taxa_unique(ps2, "Phylum"))
-p.prevdf1 <- ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(ps2),color=Family)) +
+Phylum_Prev <- subset(Taxa_Prev, Phylum %in% get_taxa_unique(Phy2, "Phylum"))
+p.prevdf1 <- ggplot(Phylum_Prev, aes(TotalAbundance, Prevalence / nsamples(Phy2),color=Family)) +
 geom_hline(yintercept = 0.05, alpha = 0.5, linetype = 2) +
 geom_point(size = 3, alpha = 0.7) +
 scale_x_log10() +
@@ -314,69 +273,68 @@ xlab("Total Abundance") + ylab("Prevalence [Frac. Samples]") +
 facet_wrap(~Phylum) +
 theme(legend.position="none") +
  ggtitle("Phylum Prevalence in All Samples\nColored by Family")
-p.prevdf1
-```	
-	
+Phylum_Prev
+```
 #### Data transformations methods and plots
 ###### Transform to Relative abundances
 ```
-ps2.ra <- transform_sample_counts(ps2, function(OTU) OTU/sum(OTU))
+Phy2.ra <- transform_sample_counts(Phy2, function(OTU) OTU/sum(OTU))
 ```
 ###### Log transformation 
 ```
-ps2.log <- transform_sample_counts(ps2, function(x) log(1 + x))
+Phy2.log <- transform_sample_counts(Phy2, function(x) log(1 + x))
 ```
 ###### Histograms of the non-transformed data vs. the transformed data can address the shift to normality
 ```
-p.no.log <- qplot(rowSums(otu_table(ps2))) + ggtitle("Raw Counts") +
+p.no.log <- qplot(rowSums(otu_table(Phy2))) + ggtitle("Raw Counts") +
   theme_bw() +
   xlab("Row Sum") +
   ylab("# of Samples")
-p.log <- qplot(log10(rowSums(otu_table(ps2)))) +
+  
+p.log <- qplot(log10(rowSums(otu_table(Phy2)))) +
   ggtitle("log10 transformed counts") +
   theme_bw() +
   xlab("Row Sum") +
   ylab("# of Samples")
 ggarrange(p.no.log, p.log, ncol = 2, labels = c("A)", "B)"))
 ```
-#### Rarefaction plot
-##### We can plot the rarefaction curve for the observed ASVs in the entire data set. This is a way to check how has the richness captured in the sequencing effort.
+##### Rarefaction plot
+##### We can plot the rarefaction curve for the observed ASVs in the entire data set. This is a way to check the richness captured in the sequencing effort.
+
 ```
 Raf <-ggrare(ps2, step = 50, color="Trial",  se = TRUE)
 ```
 ### Alpha diversity
-###### Alpha diversity is a standard tool researchers can use to calculate the number of bacterial taxa present in a study or study group and the relationships between relative abundance and how evenly taxa are distributed. These are classic representations of species number and diversity in a study which provide useful summary information about the numbers and relative abundances of bacterial taxa within your study.
+###### Alpha diversity is a standard tool use to determine the number of bacterial taxa present in a study  and how evenly the taxa are distributed.  
 ```
-SD <- sample_data(ps2) %>%
+SD <- sample_data(Phy2) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","Hatchery","Location","season","Year","Month","Season","TankLocation") %>%
+    select("Treatment","Trial", "Trial_Number","WaterType", "Name","Hatchery","Location","season","Year","Month","Season","Tank_Replicate") %>%
     mutate_if(is.factor,as.character)
 SD1 <- cbind(SampleID = rownames(SD ), SD)
 rownames(SD1 ) <- NULL
-All_S4_prune_rarefy <- rarefy_even_depth(ps2, rngseed= 81, sample.size = 10000)
-#Table1 <- otu_table(ps2)
+Phy2_rarefy <- rarefy_even_depth(Phy2, rngseed= 81, sample.size = 10000)
+#Table1 <- otu_table(Phy2)
 adiv <- data.frame(
-  "Observed" = phyloseq::estimate_richness(All_S4_prune_rarefy, measures = "Observed"),
-  "Shannon" = phyloseq::estimate_richness(All_S4_prune_rarefy, measures = "Shannon"),
-  "Simpson" = phyloseq::estimate_richness(All_S4_prune_rarefy, measures = "Simpson"),
-  "Chao1"= phyloseq::estimate_richness(All_S4_prune_rarefy, measures = "Chao1"),
-  "Status" = phyloseq::sample_data(All_S4_prune_rarefy)$Treatment)
+  "Observed" = phyloseq::estimate_richness(Phy2_rarefy, measures = "Observed"),
+  "Shannon" = phyloseq::estimate_richness(Phy2_rarefy, measures = "Shannon"),
+  "Simpson" = phyloseq::estimate_richness(Phy2_rarefy, measures = "Simpson"),
+  "Chao1"= phyloseq::estimate_richness(Phy2_rarefy, measures = "Chao1"),
+  "Status" = phyloseq::sample_data(Phy2_rarefy)$Treatment)
 head(adiv)
-adiv$ProjectName <- SD$ProjectName
+adiv$ProjectName <- SD$Trial
 adiv$Treatment <- SD$Treatment
 adiv$Name <- SD$Name
-adiv$Num <- SD$Num
 adiv$Hatchery <- SD$Hatchery
 adiv$Season <- SD$Season
 adiv$Month <- SD$Month
 adiv$Year <- SD$Year
-adiv$TankLocation <- SD$TankLocation
 adiv$Status <-as.character(adiv$Status)
 newSTorder = c("Control",  "S4")
 sample_types <- c("Control", "S4")
 sample_labels <- c("C", "S4")
 adiv$Hatchery <- factor(adiv$Hatchery, levels=c("VIMS","Mat","MOOK","RWU"))
-adiv$ProjectName <- factor(adiv$ProjectName, levels=c("T1","T2","T3","T4","T5","T6","T7","T8"))
+adiv$Trial <- factor(adiv$Trial, levels=c("T1","T2","T3","T4","T5","T6","T7","T8"))
 ```
 ##### Simpson diversity
 ```
@@ -394,17 +352,20 @@ Div_SIM <- ggplot(adiv, aes(as.factor(Name), Simpson)) +
         panel.border = element_rect(colour="grey"))+
   scale_y_continuous(limits=c(0,1))
 Div_SIM
-## Statistics
-Simp.aov <- aov(Simpson ~ ProjectName:Treatment+ProjectName+Treatment, data = adiv)
+```
+#### Statistics
+```
+Simp.aov <- aov(Simpson ~ Trial:Treatment+Trial+Treatment, data = adiv)
 summary(Simp.aov)
 TukeyHSD(Simp.aov)
-tukey_Trial2 <-HSD.test(Simp.aov, "ProjectName", group = TRUE)
+tukey_Trial2 <-HSD.test(Simp.aov, "Trial", group = TRUE)
 tukey_Trial2
-kruskal.test(Simpson ~ ProjectName, data=adiv)
 ```
+
 ##### Richness
+
 ```
-Div_rich <- ggplot(adiv, aes(as.factor(ProjectName), Chao1.Chao1)) +
+Div_rich <- ggplot(adiv, aes(as.factor(Trial), Chao1.Chao1)) +
   facet_grid(.~Hatchery, scales="free",space="free_x",switch="y")+
   geom_boxplot(aes(fill=factor(Treatment)),width=0.5)+
   #geom_signif(comparisons = list(c("A", "B"), c("B","C")),
@@ -418,20 +379,22 @@ Div_rich <- ggplot(adiv, aes(as.factor(ProjectName), Chao1.Chao1)) +
         panel.border = element_rect(colour="grey"))+
   scale_y_continuous(limits=c(0,300))
 Div_rich
-##Statistics
-Rich.aov <- aov(Chao1.Chao1 ~ ProjectName:Treatment+ProjectName, data = adiv)
+```
+#### Statistics
+```
+Rich.aov <- aov(Chao1.Chao1 ~ Trial:Treatment+Trial, data = adiv)
 summary(Rich.aov)
-tukey_Trial2 <-HSD.test(Rich.aov, "ProjectName", group = TRUE)
+tukey_Trial2 <-HSD.test(Rich.aov, "Trial", group = TRUE)
 TukeyHSD(Rich.aov)
 tukey_Trial2
 kruskal.test(Chao1.Chao1 ~ Treatment, data=adiv)
-kruskal.test(Chao1.Chao1 ~ ProjectName, data=adiv)
+kruskal.test(Chao1.Chao1 ~ Trial, data=adiv)
 ```
 #### Shared and unique ASVs across samples
 ##### By Trial
 ```
-ps2A <- prune_taxa(taxa_sums(ps2) > 0, ps2)
-upsetda <- get_upset(obj=ps2A, factorNames="ProjectName")
+Ps2A <- prune_taxa(taxa_sums(Phy2) > 0, ps2)
+upsetda <- get_upset(obj=ps2A, factorNames="Trial")
 U <- upset(upsetda, sets = c("T1", "T2", "T3", "T4", "T5", 
     "T6", "T7", "T8"), sets.bar.color = "#56B4E9",
       order.by = "freq", keep.order = TRUE, queries = list(list(query = intersects, params = list("T1", "T2", "T3", "T4", "T5", 
@@ -456,12 +419,12 @@ upset(upsetda, sets.bar.color = "darkblue",nintersects = 40, sets = c("S4", "C")
 
 ###### Log transformation moves to a more normal distribution
 ```
-#GPA1 <- ps2 %>% transform_sample_counts(function(x) log(1 + x))%>% psmelt()
+#GPA1 <- Phy2 %>% transform_sample_counts(function(x) log(1 + x))%>% psmelt()
 all_order <- GPA1 %>%group_by(Sample,OTU)%>%summarise(avg_abundance = mean(Abundance))
 Oder <-spread(all_order, Sample,avg_abundance) ##spread the data into a wide format
 Order <-Oder %>% remove_rownames %>% column_to_rownames(var="OTU")
 Abun <- as.data.frame(t(Order)) 
-SD 
+ 
 ```
 ##### By Hatchery
 ```
@@ -747,7 +710,7 @@ NMDSplot_Season
 ```
 sol_t1 <-metaMDS(Abun ,distance = "bray", k = 2, trymax = 50)
 NMDS_t1=data.frame(NMDS1=sol_t1$point[,1],NMDS2=sol_t1$point[,2],
-         ProjectName=as.factor(SD[,2]), Treatment=as.factor(SD[,1]))
+Trial=as.factor(SD[,2]), Treatment=as.factor(SD[,1]))
 library(vegan)
 veganCovEllipse<-function (cov, center = c(0, 0), scale = 1, npoints = 100) 
 {
@@ -760,23 +723,23 @@ shape_values<-seq(1,11)
 # set theme for following plots
 theme_set(theme_gray())
 plot.new()
-ord_t1<-ordiellipse(sol_t1, as.factor(SD$ProjectName),
+ord_t1<-ordiellipse(sol_t1, as.factor(SD$Trial),
                     display = "sites", kind ="sd", conf = 0.95, label = T)
 dev.off()
 #Generate ellipse points based on 95% confidence (SD) intervals
 df_ell_t1 <- data.frame()
-for(g in levels(NMDS_t1$ProjectName)){
+for(g in levels(NMDS_t1$Trial)){
   if(g!="" && (g %in% names(ord_t1))){
     df_ell_t1 <- rbind(df_ell_t1,
-    cbind(as.data.frame(with(NMDS_t1[NMDS_t1$ProjectName==g,], veganCovEllipse(ord_t1[[g]]$cov,ord_t1[[g]]$center,ord_t1[[g]]$scale))),ProjectName=g))}}
+    cbind(as.data.frame(with(NMDS_t1[NMDS_t1$Trial==g,], veganCovEllipse(ord_t1[[g]]$cov,ord_t1[[g]]$center,ord_t1[[g]]$scale))),Trial=g))}}
 #Store the center of the ellipses (mean NMDS)
-NMDS.mean_t1=aggregate(NMDS_t1[,1:2],list(group=NMDS_t1$ProjectName),mean)
+NMDS.mean_t1=aggregate(NMDS_t1[,1:2],list(group=NMDS_t1$Trial),mean)
 #Calculate p-value:
-adon_t1<-adonis2(Abun ~ProjectName, data=SD, by=NULL,method="bray", k=2)
+adon_t1<-adonis2(Abun ~Trial, data=SD, by=NULL,method="bray", k=2)
 #Plot NMDS
 NMDS_t1 <- cbind(SampleID = rownames(NMDS_t1 ), NMDS_t1)
 rownames(SD1 ) <- NULL
-NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=ProjectName))+
+NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=Trial))+
   geom_text(data=NMDS_t1,aes(NMDS1,NMDS2,label=SampleID),size=3,vjust=0)+
   # label the middle of the ellipses with the name of the grouping factor
  #annotate("text",x=NMDS.mean_t1$x,y=NMDS.mean_t1$y,
@@ -785,7 +748,7 @@ NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=ProjectName))+
   annotate("text",x=min(NMDS_t1$NMDS1),y=min(NMDS_t1$NMDS2-0.5),
            label=paste("p= ", adon_t1$`Pr(>F)`[1]),size=3)+
   # draw the ellipses. define color based on the grouping factor
-  geom_path(data=df_ell_t1, aes(x=NMDS1, y=NMDS2, linetype=ProjectName), size=1)+
+  geom_path(data=df_ell_t1, aes(x=NMDS1, y=NMDS2, linetype=Trial), size=1)+
   scale_linetype_manual(values=c("T1"="solid","T2"="dotted", "T3"="longdash","T4"="dashed","T5"="dotdash","T6"="solid","T7"="twodash","T8"="dotted"))+
   scale_colour_manual(values=c("T1"="darkgreen","T2"="purple", "T3"="red","T4"="Orange","T5"="chocolate4","T6"="blue","T7"="cyan","T8"="gray0"))+
   ggtitle("By Trial")+
@@ -802,7 +765,7 @@ NMDSplot_Trial
 ```
 sol_t1 <-metaMDS(Abun ,distance = "bray", k = 2, trymax = 50)
 NMDS_t1=data.frame(NMDS1=sol_t1$point[,1],NMDS2=sol_t1$point[,2],
-                Treatment=as.factor(SD[,1]),ProjectName=as.factor(SD[,2]))
+                Treatment=as.factor(SD[,1]),Trial=as.factor(SD[,2]))
 library(vegan)
 veganCovEllipse<-function (cov, center = c(0, 0), scale = 1, npoints = 100) 
 {
@@ -856,11 +819,11 @@ NMDSplot_Treatment
 
 ##### VIMS_Trial1
 ```
-T1 <- subset_samples(ps2, ProjectName=="T1")
+T1 <- subset_samples(Phy2, Trial=="T1")
 Table1 <- otu_table(T1)
 T1_SD <- sample_data(T1) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation") %>%
+    select("Treatment","Trial","WaterType", "Name","Tank_Replicate") %>%
     mutate_if(is.factor,as.character)
 T1_SD1 <- cbind(SampleID = rownames(T1_SD ), T1_SD)
 GPA1 <- T1 %>% transform_sample_counts(function(x) log(1 + x))%>% psmelt()
@@ -870,7 +833,7 @@ Order <-Oder %>% remove_rownames %>% column_to_rownames(var="OTU")
 Abun <- as.data.frame(t(Order))
 sol_t1 <-metaMDS(Abun ,distance = "bray", k = 2, trymax = 50)
 NMDS_t1=data.frame(NMDS1=sol_t1$point[,1],NMDS2=sol_t1$point[,2],
-                Treatment=as.factor(T1_SD[,1]),TankLocation=as.factor(T1_SD[,6]))
+                Treatment=as.factor(T1_SD[,1]),Tank_Replicate=as.factor(T1_SD[,6]))
 # define shapes for plots
 shape_values<-seq(1,11)
 # set theme for following plots
@@ -893,20 +856,18 @@ adon_t1<-adonis2(Abun ~Treatment, data=T1_SD, by=NULL,method="bray", k=2)
 NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=Treatment))+
   #geom_text(data=NMDS_t1,aes(NMDS1,NMDS2,label=SampleID),size=5,vjust=0)+
   # label the middle of the ellipses with the name of the grouping factor
- # annotate("text",x=NMDS.mean_t1$x,y=NMDS.mean_t1$y,
-          # label=NMDS.mean_t1$group,size=5)+
+ annotate("text",x=NMDS.mean_t1$x,y=NMDS.mean_t1$y,
+          label=NMDS.mean_t1$group,size=5)+
   # add the p-value in the bottom right corner
-#geom_segment(data=df_biofit, aes(x = 0, y = 0, xend = NMDS1, yend = NMDS2),arrow = arrow(length = unit(0.4, "cm")),color="black",alpha=0.05)+
- # geom_text(data=as.data.frame(df_biofit*1.1),aes(NMDS1, NMDS2, label = rownames(df_biofit)),color="black",alpha=0.5)+
-  #annotate("text",x=min(NMDS_t1$NMDS1-1),y=min(NMDS_t1$NMDS2-1), 
-          # label=paste("p= ", adon_t1$`Pr(>F)`[1]),size=3)+
+  annotate("text",x=min(NMDS_t1$NMDS1-1),y=min(NMDS_t1$NMDS2-1), 
+          label=paste("p= ", adon_t1$`Pr(>F)`[1]),size=3)+
   # draw the ellipses. define color based on the grouping factor
   geom_path(data=df_ell_t1, aes(x=NMDS1, y=NMDS2, linetype=Treatment), size=1)+
   scale_linetype_manual(values=c("C"="solid","S4"="dotted"))+
   scale_colour_manual(values=c("C"="blue","S4"="orange"))+
   ggtitle("Trial1,VIMS June 2019")+
   # add the points per sample. define shape based on Day
-  geom_point(aes(shape=TankLocation), size=8) + scale_shape_manual(values=c(15,16,17,18,7,11,13,25,22,1,5,7,9,6,14)) +
+  geom_point(aes(shape=Tank_Replicate), size=8) + scale_shape_manual(values=c(15,16,17,18,7,11,13,25,22,1,5,7,9,6,14)) +
   # reorder the legend
   guides(color = guide_legend(order=1),lty= guide_legend(order=1),
          shape = guide_legend(order=2), legend.position = "NONE")
@@ -917,11 +878,11 @@ NMDSplot_T1
 ```
 ##### VIMS_Trial2
 ```
-T2 <- subset_samples(ps2, ProjectName=="T2")
+T2 <- subset_samples(Phy2, Trial=="T2")
 Table1 <- otu_table(T2)
 T2_SD <- sample_data(T2) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation") %>%
+    select("Treatment","Trial","WaterType", "Name","TankLocation") %>%
     mutate_if(is.factor,as.character)
 T2_SD1 <- cbind(SampleID = rownames(T2_SD ), T2_SD)
 GPA <- T2 %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
@@ -959,8 +920,6 @@ NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=Treatment))+
  # annotate("text",x=NMDS.mean_t1$x,y=NMDS.mean_t1$y,
           # label=NMDS.mean_t1$group,size=5)+
   # add the p-value in the bottom right corner
-  #geom_segment(data=sig.spp.scrs, aes(xend = NMDS1, yend = NMDS2),arrow = arrow(length = unit(0.4, "cm")),color="black",alpha=0.05)+
-  #geom_text(data=as.data.frame(sig.spp.scrs*1.1),aes(NMDS1, NMDS2, label = rownames(sig.spp.scrs)),color="black",alpha=0.5)+
   #annotate("text",x=min(NMDS_t1$NMDS1),y=min(NMDS_t1$NMDS2-0.5),
            #label=paste("p= ", adon_t1$`Pr(>F)`[1]),size=3)+
   # draw the ellipses. define color based on the grouping factor
@@ -980,11 +939,11 @@ NMDSplot_T2
 ```
 ##### VIMS_Trial3
 ```
-T3 <- subset_samples(ps2, ProjectName=="T3")
+T3 <- subset_samples(Phy2, Trial=="T3")
 Table1 <- otu_table(T3)
 T3_SD <- sample_data(T3) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation") %>%
+    select("Treatment","Trial","WaterType", "Name","TankLocation") %>%
     mutate_if(is.factor,as.character)
 T3_SD1 <- cbind(SampleID = rownames(T3_SD ), T3_SD)
 GPA <- T3 %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
@@ -1023,8 +982,8 @@ NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=Treatment))+
  # annotate("text",x=NMDS.mean_t1$x,y=NMDS.mean_t1$y,
           # label=NMDS.mean_t1$group,size=5)+
   # add the p-value in the bottom right corner
-  #annotate("text",x=min(NMDS_t1$NMDS1),y=min(NMDS_t1$NMDS2-0.5), 
-         #  label=paste("p= ", adon_t1$`Pr(>F)`[1]),size=3)+
+  annotate("text",x=min(NMDS_t1$NMDS1),y=min(NMDS_t1$NMDS2-0.5), 
+          label=paste("p= ", adon_t1$`Pr(>F)`[1]),size=3)+
   # draw the ellipses. define color based on the grouping factor
   geom_path(data=df_ell_t1, aes(x=NMDS1, y=NMDS2, linetype=Treatment), size=1)+
   scale_linetype_manual(values=c("C"="solid","S4"="dotted"))+
@@ -1042,11 +1001,11 @@ NMDSplot_T3
 ```
 ##### VIMS_Trial4
 ```
-T4 <- subset_samples(ps2, ProjectName=="T4")
+T4 <- subset_samples(Phy2, Trial=="T4")
 Table1 <- otu_table(T4)
 T4_SD <- sample_data(T4) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation") %>%
+    select("Treatment","Trial", "Name","TankLocation") %>%
     mutate_if(is.factor,as.character)
 T4_SD1 <- cbind(SampleID = rownames(T4_SD ), T4_SD)
 GPA <- T4 %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
@@ -1084,7 +1043,7 @@ NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=Treatment))+
            label=NMDS.mean_t1$group,size=5)+
   # add the p-value in the bottom right corner
   annotate("text",x=min(NMDS_t1$NMDS1-1),y=min(NMDS_t1$NMDS2-1), 
-          # label=paste("p= ", adon_t1$`Pr(>F)`[1]),size=3)+
+          label=paste("p= ", adon_t1$`Pr(>F)`[1]),size=3)+
   # draw the ellipses. define color based on the grouping factor
   geom_path(data=df_ell_t1, aes(x=NMDS1, y=NMDS2, linetype=Treatment), size=1)+
   scale_linetype_manual(values=c("C"="solid","S4"="dotted"))+
@@ -1103,11 +1062,11 @@ NMDSplot_T4
 
 ##### MOOK_Trial7
 ```
-T7 <- subset_samples(ps2, Name=="T7")
+T7 <- subset_samples(Phy2, Name=="T7")
 Table1 <- otu_table(T7)
 T7_SD <- sample_data(T7) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation") %>%
+    select("Treatment","Trial", "Name","TankLocation") %>%
     mutate_if(is.factor,as.character)
 T7_SD1 <- cbind(SampleID = rownames(T7_SD ), T7_SD)
 GPA <- T7 %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
@@ -1164,11 +1123,11 @@ NMDSplot_T7
 ```
 ##### RWU_Trial8
 ```
-T8 <- subset_samples(ps2, ProjectName=="T8")
+T8 <- subset_samples(Phy2, Trial=="T8")
 Table1 <- otu_table(T8)
 T8_SD <- sample_data(T8) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation") %>%
+    select("Treatment","Trial", "Name","TankLocation") %>%
     mutate_if(is.factor,as.character)
 T8_SD1 <- cbind(SampleID = rownames(T8_SD ), T8_SD)
 GPA <- T8 %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
@@ -1226,13 +1185,13 @@ NMDSplot_T8
 #### Abundance plot
 ##### Phylum Abundance
 ```
-SD <- sample_data(ps2) %>%
+SD <- sample_data(Phy2) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation","sum","Hatchery") %>%
+    select("Treatment","Trial", "Name","TankLocation","sum","Hatchery") %>%
     mutate_if(is.factor,as.character)
 SD1 <- cbind(SampleID = rownames(SD ), SD)
 rownames(SD1 ) <- NULL
-Orderabundance <- ps2 %>%
+Orderabundance <- Phy2 %>%
 tax_glom(taxrank = "Phylum") %>% # agglomerate at phylum level
 transform_sample_counts(function(x) {x/sum(x)*100}) %>% # Transform to rel. abundance
   psmelt() %>% 
@@ -1279,7 +1238,7 @@ Order_plot <- ggplot(Order1d_count)+
   labs(x="ProjectName", y="Percentage Phylum Abundance")
 
 # plot the number of reads per sample
-Read_plot <-ggplot(SD1,aes(SampleID,sum, fill=Treatment))+
+Read_plot <-ggplot(Meta_T,aes(SampleID,sum, fill=Treatment))+
   # plot using columns
   geom_col()+theme_grey()+
   # facet by type, then trial, then day, then treatment group.
@@ -1312,9 +1271,9 @@ Order_plot1 <-grid.arrange(Read_plot, read_legend, Order_plot, ASV_legend, nrow=
 
 ##### Order Abundance
 ```
-SD <- sample_data(ps2) %>%
+SD <- sample_data(Phy2) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation", "Hatchery","sum") %>%
+    select("Treatment","Trial",  "Name","TankLocation", "Hatchery","sum") %>%
     mutate_if(is.factor,as.character)
 SD1 <- cbind(SampleID = rownames(SD ), SD)
 rownames(SD1 ) <- NULL
@@ -1369,7 +1328,7 @@ Order_plot <- ggplot(Order1d_count)+
   labs(x="ProjectName", y="Percentage Phylum Abundance")
 
 # plot the number of reads per sample
-Read_plot <-ggplot(SD1,aes(SampleID,sum, fill=Treatment))+
+Read_plot <-ggplot(Meta_T,aes(SampleID,sum, fill=Treatment))+
   # plot using columns
   geom_col()+theme_grey()+
   # facet by type, then trial, then day, then treatment group.
@@ -1404,9 +1363,9 @@ Order_plot1 <-grid.arrange(Read_plot, Order_plot, nrow=2, heights=c(1,2.5), widt
 #### Differential Abundance
 ##### By Trial
 ```
-xt <- transform(ps2, 'hellinger')
+xt <- transform(Phy2, 'hellinger')
 Orderabundance <- xt %>% tax_glom(taxrank = "Order")
-deres <- diff_analysis(obj =Orderabundance, classgroup = "Name",
+deres <- diff_analysis(obj =Orderabundance, classgroup = "Trial",
                        mlfun = "lda",alltax = TRUE,
                        filtermod = "pvalue",
                        firstcomfun = "kruskal_test",
@@ -1428,7 +1387,7 @@ es_pb
 ```
 ##### By Treatment
 ```
-xt <- transform(ps2, 'hellinger')
+xt <- transform(Phy2, 'hellinger')
 Orderabundance <- xt %>% tax_glom(taxrank = "Genus")
 deres <- diff_analysis(obj =xt, classgroup = "Treatment",
                        mlfun = "lda",alltax = TRUE,
@@ -1461,56 +1420,15 @@ diffboxT1
         axis.title.y = element_text(size = 20, face="bold"),axis.title.x = element_text(size = 20, face="bold", colour = "black"),
         title = element_text(size = 20, face="bold"))+labs(title = "Trial5")+ylab("Taxa")+theme(legend.position="bottom")+ theme(legend.title = element_text(colour="black", size=10))+ theme(legend.text = element_text(colour="black", size=14, face="bold"))
 ```
-##### Wilconxin rank sum test
-```
-ps2.log <- transform_sample_counts(ps2, function(x) log(1 + x))
-ps_wilcox <- data.frame(t(data.frame(phyloseq::otu_table(ps2.log))))
-ps_wilcox$Status <- phyloseq::sample_data(ps2.log)$Treatment
-#Define functions to pass to map
-wilcox_model <- function(df){
-  wilcox.test(abund ~ Status, data = df)
-}
-wilcox_pval <- function(df){
-  wilcox.test(abund ~ Status, data = df)$p.value
-}
-#Create nested data frames by OTU and loop over each using map 
-wilcox_results <- ps_wilcox %>%
-  gather(key = ASV, value = abund, -Status) %>%
-  group_by(ASV) %>%
-  nest() %>%
-  mutate(wilcox_test = map(data, wilcox_model),
-         p_value = map(data, wilcox_pval))    
-#Show results
-head(wilcox_results)
-head(wilcox_results$data[[1]])
-wilcox_results$wilcox_test[[1]]
-#Unnesting
-wilcox_results <- wilcox_results %>%
-  dplyr::select(ASV, p_value) %>%
-  unnest()
-alpha <- 0.01
-wilcox_results1 <- wilcox_results[which(wilcox_results$p_value < alpha), ]
-#Adding taxonomic labels
-taxa_info <- data.frame(tax_table(ps2.log))
-taxa_info <- taxa_info %>% rownames_to_column(var = "ASV")
-#Computing FDR corrected p-values
-wilcox.T1 <- wilcox_results1 %>%
-  full_join(taxa_info) %>%
-  arrange(p_value) %>%
-  mutate(BH_FDR = p.adjust(p_value, "BH")) %>%
-  filter(BH_FDR < 0.01) %>%
-  dplyr::select(ASV, p_value, BH_FDR, everything())
-write.csv(wilcox.T1, "Treatment_wilcox.csv", sep=",", row.names=FALSE, col.names=FALSE)
-set.seed(1024)
-```
+
 
 #### Effect of Probiotics on Vibrio Community
 ##### Vibrio Diversity
 ```
-(vibrio1 <- subset_taxa(ps2, Order== "Vibrionales"))
+(vibrio1 <- subset_taxa(Phy2, Order== "Vibrionales"))
 vibrio1_rarefy <- rarefy_even_depth(vibrio1, rngseed= 81, sample.size = min(sample_sums(vibrio1)))
-sample_data(vibrio1)$ProjectName <- factor(sample_data(vibrio1)$ProjectName, levels = c("T1", "T2", "T3", "T4","T5","T6","T7","T8"))
-levels(sample_data(vibrio1)$ProjectName)
+sample_data(vibrio1)$Trial <- factor(sample_data(vibrio1)$Trial, levels = c("T1", "T2", "T3", "T4","T5","T6","T7","T8"))
+levels(sample_data(vibrio1)$Trial)
 tax_table(vibrio1)
 sample_data(vibrio1)
 summary(sample_sums(vibrio1))
@@ -1535,13 +1453,12 @@ adiv <- data.frame(
   "Shannon" = phyloseq::estimate_richness(Vibrio_rarefy, measures = "Shannon"),
   "Simpson" = phyloseq::estimate_richness(Vibrio_rarefy, measures = "Simpson"),
   "Status" = phyloseq::sample_data(Vibrio_rarefy)$Treatment)
-adiv$ProjectName <-as.character(SD$ProjectName)
+adiv$Trial <-as.character(SD$Trial)
 adiv$Treatment <-as.character(SD$Treatment)
-adiv$Num <-as.character(SD$Num)
 #adiv$Type <- factor(adiv$Status, levels = newSTorder)
 
 DIV <- adiv %>% 
-  ggplot(aes(x=ProjectName,y=Simpson, label = Num, color=Status))+
+  ggplot(aes(x=ProjectName,y=Simpson, label = Trial_Number, color=Status))+
   geom_boxplot(width=.5)+
   #facet_wrap(~ System, scales = "free")+
   #facet_grid(~Status, scales = "free") +
@@ -1556,20 +1473,20 @@ scale_colour_manual(values=c("red", "purple", "green","purple"))+   #set fill co
   scale_y_continuous(limits=c(0,1))
 DIV_S <- DIV +theme(axis.text.y = element_text(size="14", color="black",face = "bold"), axis.title.y = element_text(face="bold",size="14", color="black"), axis.text.x = element_text(angle = 45,hjust=1, size="14", color="black",face = "bold"), axis.title.x = element_text(face="bold",size="14", color="black"),legend.position = "bottom")
 
-aov.simpsons.vibrio = aov(adiv$Simpson ~Treatment+ProjectName+Treatment:ProjectName, data=adiv)
+aov.simpsons.vibrio = aov(adiv$Simpson ~Treatment+Trial+Treatment:Trial, data=adiv)
 #Call for the summary of that ANOVA, which will include P-values
 summary(aov.simpsons.vibrio)
 #using tukeyHDS test to between groups and correct for multiple  comparison
-tukey_vib <-HSD.test(aov.simpsons.vibrio, "Treatment:ProjectName", group = TRUE)
+tukey_vib <-HSD.test(aov.simpsons.vibrio, "Treatment:Trial", group = TRUE)
 tukey_vib
 kruskal.test(Simpson ~ Treatment, data=adiv)
-kruskal.test(Simpson ~ ProjectName, data=adiv)
+kruskal.test(Simpson ~ Trial, data=adiv)
 ```
 ##### Vibrio Abundance
 ```
 SD <- sample_data(ps2.T1) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation","sum") %>%
+    select("Treatment","Trial","WaterType", "Name","TankLocation","sum") %>%
     mutate_if(is.factor,as.character)
 SD1 <- cbind(SampleID = rownames(SD ), SD)
 rownames(SD1 ) <- NULL
@@ -1621,7 +1538,7 @@ Vib1 <- subset_samples(vibrio1, Name=="T1")
 VibT1 <- otu_table(Vib1)
 T1_SD <- sample_data(Vib1) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation") %>%
+    select("Treatment","Type", "Name","TankLocation") %>%
     mutate_if(is.factor,as.character)
 T1_SD1 <- cbind(SampleID = rownames(T1_SD ), T1_SD)
 
@@ -1685,7 +1602,7 @@ Vib2 <- subset_samples(vibrio1, Name=="T2")
 VibT2 <- otu_table(Vib2)
 T2_SD <- sample_data(Vib2) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name","TankLocation") %>%
+    select("Treatment","Type", "Name","TankLocation") %>%
     mutate_if(is.factor,as.character)
 T2_SD1 <- cbind(SampleID = rownames(T2_SD ), T2_SD)
 GPA <- VibT2 %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
@@ -1744,7 +1661,7 @@ NMDSplot_T2
 ```
 SD <- sample_data(vibrio1) %>%
     data.frame() %>%
-    select("Treatment","ProjectName", "Num","Type", "Name") %>%
+    select("Treatment" "Trial","WterType", "Name") %>%
     mutate_if(is.factor,as.character)
 SD1 <- cbind(SampleID = rownames(SD ), SD)
 rownames(SD1 ) <- NULL
