@@ -1,0 +1,1067 @@
+```{r}
+setwd("~/Desktop/")
+library(readxl)
+library(openxlsx)
+library(vegan)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(phyloseq)
+library(gridExtra)
+library(grid)
+library(ggpubr)
+library(agricolae)
+library(microbiome)
+library(devtools) # Load the devtools package
+# library(ggh4x)
+```
+## Load the data
+```{r}
+##Count table
+abund_table <-read.xlsx("~/Desktop/Data.xlsx", sheet="table", rowNames = TRUE)
+abund_table<- as.data.frame(t(abund_table))
+abund_table1 <- cbind(SampleID = rownames(abund_table), abund_table)
+rownames(abund_table1) <- NULL
+abun_count <-gather(abund_table1, FeatureID, Value, ASV_1:ASV_4155)
+#add the rownames as a proper column
+
+## Metatable
+meta_table <-read.xlsx("~/Desktop/Data.xlsx", sheet="meta_table", rowNames = TRUE)
+meta_table1 <- cbind(SampleID = rownames(meta_table ), meta_table)
+rownames(meta_table1 ) <- NULL
+meta_table1$Treatment <- as.character(meta_table1$Treatment)
+meta_table1$Treatment <- factor(meta_table1$Treatment, levels=unique(meta_table1$Treatment))
+meta_table1Trial <- as.character(meta_table1$Trial)
+meta_table1$Trial <- factor(meta_table1$Trial, levels=unique(meta_table1$Trial))
+
+
+##Read the taxonomy table
+taxa1<-read_excel("~/Desktop/Data.xlsx", sheet = "metadata")
+tax_table1 <-do.call(rbind, strsplit(as.character(taxa1$Taxon),";"))
+colnames(tax_table1) <-c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+rownames(tax_table1)<-taxa1$FeatureID
+taxa_A <- as.data.frame(tax_table1)
+taxa_A1  <- cbind(FeatureID = rownames(taxa_A ), taxa_A)
+rownames(taxa_A1) <- NULL
+
+##convert the data to phyloseq object
+Abund_table<- as.data.frame(t(abund_table))
+A2 <-as.matrix(Abund_table)
+# first we need to create a phyloseq object using our un-transformed count table
+count_tab_pyA <- otu_table(A2, taxa_are_rows=T)
+#Read in the taxonomy 
+taxa_A2 <-taxa_A1 %>% remove_rownames %>% column_to_rownames(var="FeatureID")
+#taxa_A2 <- column_to_rownames(taxa_A1)
+taxa_A2 <-as.matrix(taxa_A2)
+tax_tab_phy <- tax_table(taxa_A2)
+## Read in the metadata
+sample_info_tab_phy <- sample_data(meta_table)
+All_S4 <-phyloseq(count_tab_pyA, tax_tab_phy, sample_info_tab_phy)
+
+##Check if there are ASV's with 0 counts, number and remove them
+All_S4_prune <- prune_taxa(taxa_sums(All_S4) > 0, All_S4)
+any(taxa_sums(All_S4_prune) == 0)
+
+##Remove any taxa associated with chloroplast and mitochondria
+justbacteria <- All_S4_prune %>%
+  subset_taxa(Kingdom == "Bacteria" & Family  != "mitochondria" & Class   != "Chloroplast" & Order   != "mitochondria" & Order   != "Chloroplast")
+
+#Join all the data
+Meta_T1<-full_join(taxa_A1, abun_count)
+combine_all <-full_join(Meta_T1,meta_table1)
+
+```
+
+# Rename and reorder factors for plotting
+## Reorder Trials
+```{r}
+# Relabel the Trial
+levels(sample_data(justbacteria)$Trial)
+sample_data(justbacteria)$Trial <- factor(sample_data(justbacteria)$Trial, levels = c("T1","T2","T3","T4","T5","T7","T8"))
+levels(sample_data(justbacteria)$Trial)
+sample_data(justbacteria)$Name <- factor(sample_data(justbacteria)$Name, labels = c("T1","T2","T3","T4","T5","T7","T8_NUV","T8_UV"))
+levels(sample_data(justbacteria)$Name)
+# Reorder Hatchery labels
+levels(sample_data(justbacteria)$Hatchery)
+sample_data(justbacteria)$Hatchery <- factor(sample_data(justbacteria)$Hatchery, levels = c("VIMS", "Mat", "MK", "RWU"))
+levels(sample_data(justbacteria)$Hatchery)
+```
+## Data assessment
+```{r}
+ #Plot number of reads for each sample and identify samples with less than 10000
+summary <- sample_sums(justbacteria)
+summary_sd <- as.data.frame(sample_data(justbacteria))
+ss.df <- merge(summary_sd, data.frame("Read" = summary), by ="row.names")
+# Plot the data by the treatment variable
+y = 10000 # Set a threshold for the minimum number of acceptable reads. Can start as a guess
+x = "SampleName" # Set the x-axis variable you want to examine
+label = "Row.names" # This is the label you want to overlay on the points
+p.ss.boxplot <- ggplot(ss.df, aes_string(x, y = "Read", color = "Treatment")) + 
+  geom_boxplot(outlier.colour="NA", position = position_dodge(width = 0.8)) +
+  geom_jitter(size = 2, alpha = 0.6) +
+  scale_y_log10() +
+  facet_wrap(~Hatchery) +
+  geom_hline(yintercept = y, lty = 2) +
+  geom_text(aes_string(label = label), size = 3, nudge_y = 0.05, nudge_x = 0.05)
+p.ss.boxplot
+
+```
+
+## Figure 1
+
+```{r, fig.width=6}
+## Plot taxa abundance at the Order level
+SD <- sample_data(justbacteria) %>% data.frame() %>% select("Treatment","Trial", "Num", "Name", "Tank_Replicate","Hatchery") %>% mutate_if(is.factor,as.character)
+SD1 <- cbind(SampleID = rownames(SD ), SD)
+rownames(SD1 ) <- NULL
+Orderabundance <- justbacteria %>% tax_glom(taxrank = "Order") %>% 
+transform_sample_counts(function(x) {x/sum(x)*100}) %>% # Transform to rel. abundance
+  psmelt() %>% arrange(Order)
+all_order <- Orderabundance %>%group_by(Sample,Order)%>%summarise(avg_abundance = mean(Abundance))
+Oder <-spread(all_order, Sample,avg_abundance) ##spread the data into a wide format
+Order <-Oder %>% remove_rownames %>% column_to_rownames(var="Order")
+Order1c<- as.data.frame(t(Order))
+Order1b <-Order1c[,order(colSums(Order1c),decreasing=TRUE)]
+#Extract the list of top 12 Taxa and assign the remaining as "Others"
+N<-12 
+taxa_list<-colnames(Order1b)[1:N]
+Order1d <-data.frame(Order1b[,colnames(Order1b) %in% taxa_list], Others=rowSums(Order1b[,!colnames(Order1b) %in% taxa_list]))
+Order1d_long <-gather(Order1d, SampleID, Value)
+Order1d_long$Taxa <-factor(Order1d_long$SampleID, levels = unique(Order1d_long$SampleID))
+Order1d_count<-as.data.frame(c(SD1, Order1d_long))
+Order1d_countO <- Order1d_count %>% group_by(SampleID,Num,Trial,Treatment,Name,Tank_Replicate,Taxa,Hatchery) %>% summarise(mean_read=mean(Value), sd_read=sd(Value))
+
+my_colors <- c("#CBD588", "#5F7FC7", "orange","#DA5724", "#508578", "#CD9BCD", "#AD6F3B", "#673770","#D14285", "#652926", "#C84248",
+  "#8569D5", "#5E738F","#D1A33D")
+
+Order1d_countO$Trial <- as.character(Order1d_countO$Trial)
+Order1d_countO$Trial <- factor(Order1d_countO$Trial, levels=c("T1","T2","T3","T4","T5","T6","T7","T8"))
+Order1d_countO$Treatment <- as.character(Order1d_countO$Treatment)
+Order1d_countO$Treatment <- factor(Order1d_countO$Treatment, levels=unique(Order1d_countO$Treatment))
+Order1d_countO$Name <- as.character(Order1d_countO$Name, 
+levels=c("T1","T2","T3","T4","T5","T6","T7","T8_NUV","T8_UV"))
+Order1d_countO$Hatchery <- as.character(Order1d_countO$Hatchery)
+Order1d_countO$Hatchery <- factor(Order1d_countO$Hatchery, levels=c("VIMS","Mat","MK","RWU"))
+
+# plot the percent order abundance
+Order_plot <- ggplot(Order1d_countO)+
+  geom_col(mapping = aes(x = Num, y = mean_read, fill = Taxa), position = "fill", show.legend = TRUE)+
+  ylab("Percent Order Abundance") +
+  theme(strip.background = element_rect(colour="black", size=1))+
+  theme(strip.text.x = element_text(size=20,face="bold"))+
+  facet_nested(. ~Hatchery+Name+Treatment, scales = "free", switch = "x") +
+  scale_fill_manual(values = my_colors) +
+  xlab(" ")+
+  scale_y_continuous(expand = c(0,0),labels=scales::percent)+
+  theme_minimal()+theme(axis.text.x = element_blank()) + theme(strip.background = element_rect(fill="gray85"),panel.spacing = unit(0.2,"lines"),axis.text.y.left = element_text(colour="black", size=16, face="bold"),axis.title.y = element_text(size = 16, face="bold"),title = element_text(size = 16, face="bold"))+ theme(legend.position="right")+ theme(legend.title = element_text(colour="black", size=16))+ theme(legend.text = element_text(colour="black", size=16, face="bold"))
+  
+Order_plot
+```
+
+## Figure2
+```{r, fig.width=4}
+## Get the number of reads for each sample
+sample_sum <- data.frame(Read = sample_sums(justbacteria))
+sum(sample_sum[, 'Read'])
+Sample_reads <- cbind(SampleID = rownames(sample_sum), sample_sum)
+rownames(Sample_reads) <- NULL
+
+#Delete samples less than 10000 reads
+justbacteria_10000 <- subset_samples(justbacteria, sample_sums(justbacteria) > 10000)
+sample_sum_df <- data.frame(filtered_read = sample_sums(justbacteria_10000))
+sum(sample_sum_df[, 'filtered_read'])
+Sample_reads_filter <- cbind(SampleID = rownames(sample_sum_df), sample_sum_df)
+rownames(Sample_reads_filter) <- NULL
+Reads <-full_join(Sample_reads, Sample_reads_filter)
+
+justbacteria_10000_rarefy <- rarefy_even_depth(justbacteria_10000, rngseed= 81, sample.size = min(sample_sums(justbacteria_10000)))
+
+SD <- sample_data(justbacteria_10000_rarefy) %>%
+    data.frame() %>%
+    select("Treatment","Trial","Num", "Name","Hatchery","Tank_Replicate") %>% mutate_if(is.factor,as.character)
+SD1 <- cbind(SampleID = rownames(SD ), SD)
+rownames(SD1 ) <- NULL
+adiv <- data.frame(
+  "Observed" = phyloseq::estimate_richness(justbacteria_10000_rarefy, measures = "Observed"),
+  "Shannon" = phyloseq::estimate_richness(justbacteria_10000_rarefy, measures = "Shannon"),
+  "Simpson" = phyloseq::estimate_richness(justbacteria_10000_rarefy, measures = "Simpson"),
+  "Chao1"= phyloseq::estimate_richness(justbacteria_10000_rarefy, measures = "Chao1"),
+  "Status" = phyloseq::sample_data(justbacteria_10000_rarefy)$Treatment)
+adiv$Trial <- SD$Trial
+adiv$Treatment <- SD$Treatment
+adiv$Num <- SD$Num
+adiv$Tank_Replicate <- SD$Tank_Replicate
+adivA <- adiv %>% group_by(Num,Trial,Treatment,Tank_Replicate) %>% summarise(mean_read=mean(Simpson), sd_read=sd(Simpson))
+Div <-adivA %>% remove_rownames %>% column_to_rownames(var="Num")
+
+##Plot
+Div_SIM <- ggplot(Div, aes(as.factor(Treatment),mean_read)) +
+  facet_grid(.~Trial, scales="free",space="free_x",switch="y")+
+  geom_boxplot(aes(fill=factor(Treatment)),width=0.5)+
+  geom_jitter()+
+  scale_fill_manual(values=c("blue", "orange","blue", "orange")) +
+  labs(y="Simpson's Diversity", x="Treatment", fill="Treatment")+theme_bw()+
+  theme(strip.text.x = element_text(size=12,face="bold"))+
+  theme(strip.background = element_rect(fill="gray85"))+
+  theme(axis.text.y = element_text(size="14", color="black"), axis.title.y = element_text(face="bold",size="14", color="black"))+theme(axis.text.x = element_text(size="12", color="black", angle = 0), axis.title.x.bottom = element_text(face="bold",size="14", color="black"))+theme(axis.text.x.top= element_text(face="bold",size="14", color="black"),
+        legend.position = "None",panel.spacing = unit(0.2, "mm"),               
+        panel.border = element_rect(colour="grey"))+
+  scale_y_continuous(limits=c(0,1))
+Div_SIM
+
+#ggsave(filename = "Diversity.png", plot = Div_SIM , width=20, height=20, units="cm", dpi = 400)
+```
+
+## Stats for Simpson diversity
+```{r}
+#Simpson's diversity
+library(lme4)
+library(car)
+library(emmeans)
+
+Avg_Simp <- adiv %>% group_by(Num,Trial,Treatment,Tank_Replicate) %>% summarise(mean_Simpsons=mean(Simpson), sd_Simpsons=sd(Simpson))
+Avg_Chao1 <- adiv %>% group_by(Num,Trial,Treatment,Tank_Replicate) %>% summarise(mean_Chao1=mean(Chao1.Chao1), sd_Chao1=sd(Chao1.Chao1))
+Average <- Quality <- full_join(Avg_Chao1, Avg_Simp)
+A2 <-Average %>% remove_rownames %>% column_to_rownames(var="Num")
+df2 <- A2[-c(32,33,34,35,36,37),] ### This is to exclude trial 5 from the analysis
+
+Simpsons_Div = lmer(mean_Simpsons ~ Trial*Treatment+(1|Tank_Replicate), data=df2, REML = FALSE)
+Summary <- summary(Simpsons_Div)
+## Run ANOVA on the model to determine statistical significance of the factors
+Anova(Simpsons_Div)
+## Perform a pairwise comparison of treatment in each trial
+emm.div = emmeans(Simpsons_Div, ~ Trial)
+Simp_Diversity = data.frame(contrast(emm.div, interaction = "pairwise", adjust = "Bonferroni"))
+Simp_Diversity
+
+##Chao1 richness
+Chao1_Div = lmer(mean_Chao1 ~ Trial*Treatment+(1|Tank_Replicate), data=Average, REML = FALSE)
+summary(Chao1_Div)
+## Run ANOVA on the model to determine statistical significance of the factors
+Anova(Chao1_Div)
+## Perform a pairwise comparison of treatment in each trial
+emm.trajectory = emmeans(Chao1_Div, ~ Treatment | Trial)
+Chao1_Diversity = data.frame(contrast(emm.trajectory, interaction = "pairwise", adjust = "Bonferroni"))
+Chao1_Diversity
+```
+
+##Figure 3
+
+```{r }
+##This code was used to generate plots for all other trials
+## Trial1
+T1 <- subset_samples(justbacteria, Trial=="T1")
+Table1 <- otu_table(T1)
+GPA <- T1 %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
+all_order <- GPA %>%group_by(Num,OTU)%>%summarise(avg_abundance = mean(Abundance))
+Oder <-spread(all_order, Num,avg_abundance) ##spread the data into a wide format
+Order <-Oder %>% remove_rownames %>% column_to_rownames(var="OTU")
+Abun <- as.data.frame(t(Order))
+
+T1_SD <- sample_data(T1) %>%
+    data.frame() %>%
+    select("Treatment","Trial", "Num","Tank_Replicate") %>%
+    mutate_if(is.factor,as.character)
+T1_SD1 <- cbind(SampleID = rownames(T1_SD ), T1_SD)
+sample_sum_df <- data.frame(sum = sample_sums(T1))
+sum(sample_sum_df[, 'sum'])
+Sample_reads <- cbind(SampleID = rownames(sample_sum_df), sample_sum_df)
+rownames(Sample_reads) <- NULL
+all_SD <- full_join(T1_SD1,Sample_reads)
+rownames(SD1 ) <- NULL
+Meta <- all_SD %>%group_by(Num,Treatment,Trial,Tank_Replicate)%>%summarise(avg_abundance = mean(sum))
+Meta <- Meta %>% remove_rownames %>% column_to_rownames(var="Num")
+
+nmds_t1 <-metaMDS(Abun ,distance = "bray", k = 2, trymax = 50)
+NMDS_t1=data.frame(NMDS1=nmds_t1$point[,1],NMDS2=nmds_t1$point[,2],
+                Treatment=as.factor( Meta[,1]),Tank_Replicate=as.factor( Meta[,3]))
+theme_set(theme_gray())
+plot.new()
+ord_t1<-ordiellipse(nmds_t1, as.factor( Meta$Treatment),
+                    display = "sites", kind ="sd", conf = 0.95, label = T)
+dev.off()
+#Generate ellipse points 
+veganCovEllipse<-function (cov, center = c(0, 0), scale = 1, npoints = 100) 
+{
+  theta <- (0:npoints) * 2 * pi/npoints
+  Circle <- cbind(cos(theta), sin(theta))
+  t(center + scale * t(Circle %*% chol(cov)))
+}
+df_ell_t1 <- data.frame()
+for(g in levels(NMDS_t1$Treatment)){
+  if(g!="" && (g %in% names(ord_t1))){
+    df_ell_t1 <- rbind(df_ell_t1,
+    cbind(as.data.frame(with(NMDS_t1[NMDS_t1$Treatment==g,],                            veganCovEllipse(ord_t1[[g]]$cov,ord_t1[[g]]$center,ord_t1[[g]]$scale))),Treatment=g))}}
+#Calculate p-value:
+adon_t1<-adonis2(Abun ~Treatment, data=Meta, by=NULL,method="bray", k=2)
+
+#Plot NMDS
+NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=Treatment))+
+  annotate("text",x=min(NMDS_t1$NMDS1),y=min(NMDS_t1$NMDS2-0.5), 
+           label=paste("P value=0.02"))+
+  annotate("text",x=min(NMDS_t1$NMDS1-0.003),y=min(NMDS_t1$NMDS2-0.6), 
+          label=paste("Stress=0.1"))+
+  geom_path(data=df_ell_t1, aes(x=NMDS1, y=NMDS2, linetype=Treatment), size=1)+
+  scale_linetype_manual(values=c("C"="solid","S4"="dotted"))+
+  scale_colour_manual(values=c("C"="blue","S4"="orange"))+
+  ggtitle("Trial1, VIMS")+
+  geom_point(aes(shape=Treatment), size=5) + scale_shape_manual(values=c(15,16)) 
+NMDSplot_T1 <- NMDSplot_t3 + theme(axis.text.y = element_text(size="12", color="black"), axis.title.y = element_text(face="bold",size="12", color="black"))+
+theme(axis.text.x = element_text(size="12", color="black"), axis.title.x.bottom = element_text(face="bold",size="12", color="black"))+
+theme(axis.text.x.top= element_text(face="bold",size="12", color="black"))+theme(plot.title=element_text(size = 16, face = "bold", hjust = 0.5))
+
+NMDSplot_T1
+
+
+##plot all the NMDS figures together
+library(patchwork)
+
+(NMDSplot_T1 | NMDSplot_T2 | NMDSplot_T3) /
+(NMDSplot_T4 | NMDSplot_T7 | NMDSplot_T8)+ plot_layout(guides = 'collect')
+
+#ggsave(filename = "NMDS_Treatment.png", plot = Mook , width=40, height=20, units="cm", dpi = 400)
+
+```
+
+## Beta diversity Statistics
+
+```{r}
+#PERMANOVA
+SD <- sample_data(justbacteria) %>%
+    data.frame() %>%
+    select("Treatment","Num","Trial", "Location","Year","Season","Hatchery","Tank_Replicate","SampleName") %>%
+    mutate_if(is.factor,as.character)
+SD1 <- cbind(SampleID = rownames(SD ), SD)
+rownames(SD1 ) <- NULL
+all_SD <- full_join(SD1,Sample_reads)
+rownames(SD1 ) <- NULL
+Meta <- all_SD %>%group_by(Num,Treatment,Trial,Location,Year,Season,Hatchery,Tank_Replicate)%>%summarise(avg_abundance = mean(sum))
+
+GPA <- justbacteria %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
+all_order <- GPA %>%group_by(Num,OTU)%>%summarise(avg_abundance = mean(Abundance))
+Oder <-spread(all_order, Num,avg_abundance) ##spread the data into a wide format
+Order <-Oder %>% remove_rownames %>% column_to_rownames(var="OTU")
+Abun <- as.data.frame(t(Order))
+
+BC.dist=vegdist(Abun, distance="bray")
+adonis2(BC.dist ~ Season*Hatchery*Location*Treatment*Year*Trial, data = Meta, permutations = 1000)
+
+#Beta dispersion
+disp.Treatment = betadisper(BC.dist, Meta$Treatment)
+#Perform an ANOVA-like test to determine if the variances differ by groups.
+permutest(disp.Treatment, pairwise=TRUE, permutations=1000)
+```
+
+## Figure 4
+```{r}
+library(phylosmith)
+library(VennDiagram)
+library(UpSetR)
+library(MicrobiotaProcess)
+
+unique_taxa(justbacteria, treatment = 'Treatment')
+ps2A <- prune_taxa(taxa_sums(justbacteria) > 0, justbacteria)
+#Plot by Trial
+upsetda <- get_upset(obj=ps2A, factorNames="Trial")
+By_Trial <- upset(upsetda, sets.bar.color = "darkblue", sets = c("T1", "T2", "T3", "T4", "T5", "T7", "T8"), queries = list(list(query = intersects, params = list("T1", "T2", "T3", "T4", "T5", 
+     "T7", "T8"), color = "orange", active = T)),order.by = "freq", empty.intersections = "on",keep.order = TRUE,number.angles = 0, point.size = 2.5,line.size = 1, mb.ratio = c(0.55, 0.45),
+    mainbar.y.label = "ASVs Intersections", sets.x.label = "Total number of ASV per trial",text.scale = c(1.3, 1.3, 1.3, 1.0, 1.2, 1.2))
+```
+
+## Figure 5
+```{r}
+library(ANCOMBC)
+out <- ancombc(justbacteria,formula = "Trial+Treatment", p_adj_method = "fdr", lib_cut = 1000, group = "Treatment", struc_zero = TRUE, neg_lb = TRUE, tol = 1e-5, max_iter = 100, conserve = TRUE, alpha = 0.05, 
+  global = TRUE)
+
+res <- out$res
+Diff <- res$diff_abn
+Diff1 <- Diff%>%
+    data.frame() %>%
+    select("TreatmentS4") %>%
+    mutate_if(is.factor,as.character)
+Diff2 <- cbind(FeatureID = rownames(Diff1 ), Diff1)
+rownames(Diff2) <- NULL
+names(Diff2)[names(Diff2) == "TreatmentS4"] <- "Differential" 
+
+LFC <- res$beta
+names(LFC)[names(LFC) == "TreatmentS4"] <- "Logfoldchange" 
+LFC1 <- LFC%>%
+    data.frame() %>%
+    select("Logfoldchange") %>%
+    mutate_if(is.factor,as.character)
+LFC2 <- cbind(FeatureID = rownames(LFC1 ), LFC1)
+rownames(LFC2) <- NULL
+
+pval <- res$q_val
+pval <- cbind(FeatureID = rownames(pval ), pval)
+rownames(pval) <- NULL
+names(pval)[names(pval) == "TreatmentS4"] <- "pvalue" 
+Pvalue <-pval%>%
+    data.frame() %>%
+    select("FeatureID","pvalue") %>%
+    mutate_if(is.factor,as.character)
+stat <- full_join(LFC2, Pvalue)
+stat1 <- full_join(stat,Diff2)
+
+sigtab <- stat1 %>% filter(pvalue < 0.05)
+stat1 <- full_join(sigtab, taxa_A1)
+Order <-stat1 %>% remove_rownames %>% column_to_rownames(var="FeatureID")
+ANCOM_BC <- Order[1:25,]
+ANCOM_BC
+#write.csv(ANCOM_BC,"ANCOM_BCUV.csv")
+
+##Plot
+Method <-read.xlsx("~/Documents/sequence/All_data.xlsx", sheet="ANCOM_BC", rowNames = TRUE)
+ANCOMBC_plot <- ggplot(Method,aes(x=Genus,y=Logfoldchange,fill=Logfoldchange>0))+
+geom_col() + coord_flip()+
+scale_fill_manual(values=c("blue","orange"),
+labels=c("Control","S4"))
+ANCOMBC_plotA <- ANCOMBC_plot +theme(axis.text.x = element_text(colour="black", size=12, face="bold")) +
+  theme(strip.background = element_rect(fill="gray85"),axis.text.y.left = element_text(colour="black", size=12, face="bold"),axis.text.y.right = element_text(colour="black", size=12, face="bold"),
+        axis.title.y = element_text(size = 12, face="bold"),axis.title.x = element_text(size = 12, face="bold", colour = "black"),
+        title = element_text(size = 12, face="bold"))+
+  guides(fill=guide_legend(title="Treatment"))
+ANCOMBC_plotA
+
+#ggsave(filename = "ANCOMBC_plot.png", plot = ANCOMBC_plotA , width=20, height=20, units="cm", dpi = 400)
+
+
+```
+
+## Figure 6 (UV vs NonUV Figures)
+```{r}
+
+UV_NonUV <- subset_samples(justbacteria, UV_NUV == "Y")
+UV_NonUV_10000 <- subset_samples(UV_NonUV, sample_sums(UV_NonUV) > 10000)
+UV_NonUV_rarefy <- rarefy_even_depth(UV_NonUV_10000, rngseed= 81, sample.size = min(sample_sums(UV_NonUV_10000)))
+UV_NonUV_SD <- sample_data(UV_NonUV) %>%
+    data.frame() %>%
+    select("Treatment","Trial", "Num","Type", "Name","Tank_Replicate","Condition") %>%
+    mutate_if(is.factor,as.character)
+UV_NonUV_SD1 <- cbind(SampleID = rownames(UV_NonUV_SD ), UV_NonUV_SD)
+Meta <-UV_NonUV_SD1 %>%group_by(Num,Condition,Treatment,Type,Tank_Replicate)%>%summarise(avg_abundance = mean(sum))
+ Meta <- Meta %>% remove_rownames %>% column_to_rownames(var="Num")
+ 
+DIV <- data.frame(
+  "Chao1" = phyloseq::estimate_richness(UV_NonUV_rarefy, measures = "Chao1"),
+  "Shannon" = phyloseq::estimate_richness(UV_NonUV_rarefy, measures = "Shannon"),
+  "Simpson" = phyloseq::estimate_richness(UV_NonUV_rarefy, measures = "Simpson"),
+  "Status" = phyloseq::sample_data(UV_NonUV_rarefy)$Treatment)
+DIV$Type <- UV_NonUV_SD$Type
+DIV$Trial <- UV_NonUV_SD$Trial
+DIV$Treatment <- UV_NonUV_SD$Treatment
+DIV$Type <- UV_NonUV_SD$Type
+DIV$Num <- UV_NonUV_SD$Num
+DIV$Condition <- UV_NonUV_SD$Condition
+DIV$Tank_Replicate <- UV_NonUV_SD$Tank_Replicate
+
+DIVS <- DIV %>% group_by(Num,Trial,Type,Treatment,Tank_Replicate, Condition) %>% summarise(mean_read=mean(Simpson), sd_read=sd(Simpson))
+DIVS$Condition <- as.character(DIVS$Condition)
+DIVS$Condition <- factor(DIVS$Condition, levels=unique(DIVS$Condition))
+
+library(ggsignif)
+Div_UV <- ggplot(DIVS, aes(as.factor(Condition), mean_read)) +
+  geom_boxplot(aes(fill=factor(Condition)),width=0.5)+
+  scale_fill_manual(values=c("blue", "orange","blue", "orange")) +
+  labs(y="Simpson's Diversity ", x="Treatment", fill="Treatment")+theme_bw()+
+  theme(strip.text.x = element_text(size=12,face="bold"))+
+  theme(strip.background = element_rect(fill="gray85"))+
+  theme(panel.border = element_rect(fill=NA, colour = "black", 
+size=1.5))+
+  geom_signif(comparisons=list(c("C_NUV", "C_UV")), annotations="**", y_position = 0.75, tip_length = 0, vjust=2, coord.flip = TRUE,map_signif_level = TRUE)+
+    geom_signif(comparisons=list(c("C_UV", "S4_UV")), annotations="**", y_position = 0.95, tip_length = 0, hjust=1, map_signif_level = TRUE)+
+  theme(axis.text.y = element_text(size="12", color="black"), axis.title.y = element_text(face="bold",size="12", color="black"))+theme(axis.text.x = element_text(size="12", color="black", angle = 0), axis.title.x.bottom = element_text(face="bold",size="14", color="black"))+theme(axis.text.x.top= element_text(face="bold",size="14", color="black"),
+        legend.position = "None",panel.spacing = unit(0.2, "mm"),               
+        panel.border = element_rect(colour="black", size=1))+
+  scale_y_continuous(limits=c(0,1))
+Div_UV
+
+## Stats
+## Run the model
+Simpsons_Div = lmer(mean_read ~ Condition+(1|Tank_Replicate), data=DIVS, REML = FALSE)
+summary(Simpsons_Div)
+plot(Simpsons_Div)
+## Run ANOVA on the model to determine statistical significance of the factors
+Anova(Simpsons_Div)
+emm.trajectory = emmeans(Simpsons_Div, ~ Condition)
+Diversity_Comp = data.frame(contrast(emm.trajectory, interaction = "pairwise", adjust = "Bonferroni"))
+#write.csv(Diversity_Comp,"Diversity_Pairwise.csv")
+
+```
+
+```{r}
+##NDMS plot for the four conditions
+UV_NonUV_SD <- sample_data(UV_NonUV) %>% data.frame() %>% select("Treatment","Trial","Condition", "Num","Tank_Replicate") %>%
+    mutate_if(is.factor,as.character)
+UV_NonUV_SD1 <- cbind(SampleID = rownames(UV_NonUV_SD ), UV_NonUV_SD)
+sample_sum_df <- data.frame(sum = sample_sums(UV_NonUV))
+sum(sample_sum_df[, 'sum'])
+Sample_reads <- cbind(SampleID = rownames(sample_sum_df), sample_sum_df)
+rownames(Sample_reads) <- NULL
+all_SD <- full_join(UV_NonUV_SD1,Sample_reads)
+rownames(all_SD ) <- NULL
+Meta <- all_SD %>%group_by(Num,Treatment,Trial,Condition,Tank_Replicate)%>%summarise(avg_abundance = mean(sum))
+Meta <- Meta %>% remove_rownames %>% column_to_rownames(var="Num")
+
+GPA <- UV_NonUV %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
+all_order <- GPA %>%group_by(Num,OTU)%>%summarise(avg_abundance = mean(Abundance))
+Oder <-spread(all_order, Num,avg_abundance) 
+Order <-Oder %>% remove_rownames %>% column_to_rownames(var="OTU")
+Abun <- as.data.frame(t(Order))
+nmds_t1 <-metaMDS(Abun ,distance = "bray", k = 2, trymax = 50)
+NMDS_t1=data.frame(NMDS1=nmds_t1$point[,1],NMDS2=nmds_t1$point[,2],
+                Treatment=as.factor(Meta[,1]),Condition=as.factor(Meta[,3]))
+NMDS_t1$Condition <- as.character(NMDS_t1$Condition)
+NMDS_t1$Condition <- factor(NMDS_t1$Condition, levels=unique(NMDS_t1$Condition))
+theme_set(theme_gray())
+plot.new()
+ord_t1<-ordiellipse(nmds_t1, as.factor(Meta$Condition),
+                    display = "sites", kind ="sd", conf = 0.95, label = T)
+dev.off()
+#Generate ellipse points based on 95% confidence (SD) intervals
+df_ell_t1 <- data.frame()
+for(g in levels(NMDS_t1$Condition)){
+  if(g!="" && (g %in% names(ord_t1))){
+    df_ell_t1 <- rbind(df_ell_t1,
+    cbind(as.data.frame(with(NMDS_t1[NMDS_t1$Condition==g,],                            veganCovEllipse(ord_t1[[g]]$cov,ord_t1[[g]]$center,ord_t1[[g]]$scale))),Condition=g))}}
+df_ell_t1$Condition <- as.character(df_ell_t1$Condition )
+df_ell_t1$Condition  <- factor(df_ell_t1$Condition , levels=unique(df_ell_t1$Condition ))
+#Calculate p-value:
+adon_t1<-adonis2(Abun ~Condition, data=Meta, by=NULL,method="bray", k=2)
+
+#Plot NMDS
+NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=Condition))+
+  annotate("text",x=min(NMDS_t1$NMDS1),y=min(NMDS_t1$NMDS2-0.5), 
+           label=paste("P value= 0.002"))+
+  annotate("text",x=min(NMDS_t1$NMDS1-0.003),y=min(NMDS_t1$NMDS2-0.6), 
+          label=paste("Stress=0.05"))+
+  geom_path(data=df_ell_t1, aes(x=NMDS1, y=NMDS2, linetype=Condition), size=1)+
+  scale_linetype_manual(values=c("C_NUV"="solid","S4_NUV"="dotted","C_UV"="solid","S4_UV"="dotted"))+
+  scale_colour_manual(values=c("C_NUV"="cornflowerblue","S4_NUV"="cornflowerblue","C_UV"="chocolate1","S4_UV"="chocolate1"))+
+  geom_point(aes(shape=Treatment), size=5) + scale_shape_manual(values=c(15,16)) +
+  # reorder the legend
+  guides(color = guide_legend(order=1),lty= guide_legend(order=1),
+         shape = guide_legend(order=2), legend.position = "NONE")
+NMDSplot_NUV <- NMDSplot_t3 + theme(axis.text.y = element_text(size="12", color="black"), axis.title.y = element_text(face="bold",size="12", color="black"))+
+theme(axis.text.x = element_text(size="12", color="black"), axis.title.x.bottom = element_text(face="bold",size="12", color="black"))+
+theme(axis.text.x.top= element_text(face="bold",size="12", color="black"))+theme(plot.title=element_text(size = 16, face = "bold", hjust = 0.5))
+NMDSplot_NUV
+
+## Stats
+BC.dist=vegdist(Abun, distance="bray")
+adonis2(BC.dist ~ Condition, data =Meta, permutations = 1000)
+disp.age = betadisper(BC.dist, Meta$Treatment)
+#Perform an ANOVA test to determine if the variances differ by groups.
+permutest(disp.age, pairwise=TRUE, permutations=1000)
+
+
+library(patchwork)
+(Div_UV / NMDSplot_NUV) / 
+  (plot_spacer() + plot_spacer()) + plot_layout(ncol = 2)
+
+```
+
+
+### Supplementary Figures
+## Figure S3
+```{r}
+sample_sum <- data.frame(Read = sample_sums(justbacteria))
+sum(sample_sum[, 'Read'])
+Sample_reads <- cbind(SampleID = rownames(sample_sum), sample_sum)
+rownames(Sample_reads) <- NULL
+#write.csv(Sample_reads,"Reads.csv")
+
+#Delete samples less than 10000 reads
+justbacteria_10000 <- subset_samples(justbacteria, sample_sums(justbacteria) > 10000)
+sample_sum_df <- data.frame(filtered_read = sample_sums(justbacteria_10000))
+sum(sample_sum_df[, 'filtered_read'])
+Sample_reads_filter <- cbind(SampleID = rownames(sample_sum_df), sample_sum_df)
+rownames(Sample_reads_filter) <- NULL
+#write.csv(Reads,"Reads_filter.csv")
+Reads <-full_join(Sample_reads, Sample_reads_filter)
+
+justbacteria_10000_rarefy <- rarefy_even_depth(justbacteria_10000, rngseed= 81, sample.size = min(sample_sums(justbacteria_10000)))
+
+SD <- sample_data(justbacteria_10000_rarefy) %>%
+    data.frame() %>%
+    select("Treatment","Trial","Num", "Name","Hatchery","Tank_Replicate") %>% mutate_if(is.factor,as.character)
+SD1 <- cbind(SampleID = rownames(SD ), SD)
+rownames(SD1 ) <- NULL
+adiv <- data.frame(
+  "Observed" = phyloseq::estimate_richness(justbacteria_10000_rarefy, measures = "Observed"),
+  "Shannon" = phyloseq::estimate_richness(justbacteria_10000_rarefy, measures = "Shannon"),
+  "Simpson" = phyloseq::estimate_richness(justbacteria_10000_rarefy, measures = "Simpson"),
+  "Chao1"= phyloseq::estimate_richness(justbacteria_10000_rarefy, measures = "Chao1"),
+  "Status" = phyloseq::sample_data(justbacteria_10000_rarefy)$Treatment)
+adiv$Trial <- SD$Trial
+adiv$Treatment <- SD$Treatment
+adiv$Num <- SD$Num
+adiv$Tank_Replicate <- SD$Tank_Replicate
+
+adivC <- adiv %>% group_by(Num,Trial,Treatment,Tank_Replicate) %>% summarise(mean_read=mean(Chao1.Chao1), sd_read=sd(Chao1.Chao1))
+A2 <-adivC %>% remove_rownames %>% column_to_rownames(var="Num")
+
+Div_Chao1 <- ggplot(A2, aes(as.factor(Treatment), mean_read)) +
+  facet_grid(.~Trial, scales="free",space="free_x",switch="y")+
+  geom_boxplot(aes(fill=factor(Treatment)),width=0.5)+
+  geom_jitter()+
+  #geom_signif(comparisons = list(c("A", "B"), c("B","C")),
+          #map_signif_level=TRUE)+
+  scale_fill_manual(values=c("blue", "orange","blue", "orange")) +
+  labs(y="Chao1 Richness", x="Treatment", fill="Treatment")+theme_bw()+
+  theme(strip.text.x = element_text(size=12,face="bold"))+
+  theme(strip.background = element_rect(fill="gray85"))+
+  theme(axis.text.y = element_text(size="14", color="black"), axis.title.y = element_text(face="bold",size="14", color="black"))+theme(axis.text.x = element_text(size="12", color="black", angle = 0), axis.title.x.bottom = element_text(face="bold",size="14", color="black"))+theme(axis.text.x.top= element_text(face="bold",size="14", color="black"),
+        legend.position = "None",panel.spacing = unit(0.2, "mm"),               
+        panel.border = element_rect(colour="grey"))+
+  scale_y_continuous(limits=c(0,300))
+Div_Chao1
+
+```
+## Figure S4
+## NMDS plot 
+```{r,fig.width=4}
+##By Hatchery
+GPA <- justbacteria %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
+all_order <- GPA %>%group_by(Num,OTU)%>%summarise(avg_abundance = mean(Abundance))
+Oder <-spread(all_order,Num,avg_abundance) ##spread the data into a wide format
+Order <-Oder %>% remove_rownames %>% column_to_rownames(var="OTU")
+Abun <- as.data.frame(t(Order))
+sample_sum_df <- data.frame(sum = sample_sums(justbacteria))
+sum(sample_sum_df[, 'sum'])
+Sample_reads <- cbind(SampleID = rownames(sample_sum_df), sample_sum_df)
+rownames(Sample_reads) <- NULL
+
+SD <- sample_data(justbacteria) %>%
+    data.frame() %>%
+    select("Treatment","Num","Trial","Type", "Location","Year","Season","Hatchery","Tank_Replicate",) %>%
+    mutate_if(is.factor,as.character)
+SD1 <- cbind(SampleID = rownames(SD ), SD)
+all_SD <- full_join(SD1,Sample_reads)
+rownames(SD1 ) <- NULL
+Meta <- all_SD %>%group_by(Num,Treatment,Trial,Type,Location,Year,Season,Hatchery,Tank_Replicate)%>%summarise(avg_abundance = mean(sum))
+Meta <- Meta %>% remove_rownames %>% column_to_rownames(var="Num")
+ 
+nmds_t1 <-metaMDS(Abun ,distance = "bray", k = 2, trymax = 50)
+NMDS_t1=data.frame(NMDS1=nmds_t1$point[,1],NMDS2=nmds_t1$point[,2],
+          Treatment=as.factor(Meta[,1]),Hatchery=as.factor( Meta[,7]))
+veganCovEllipse<-function (cov, center = c(0, 0), scale = 1, npoints = 100) 
+{
+  theta <- (0:npoints) * 2 * pi/npoints
+  Circle <- cbind(cos(theta), sin(theta))
+  t(center + scale * t(Circle %*% chol(cov)))
+}
+theme_set(theme_gray())
+plot.new()
+ord_t1<-ordiellipse(nmds_t1, as.factor(Meta$Hatchery),
+                    display = "sites", kind ="sd", conf = 0.95, label = T)
+dev.off()
+df_ell_t1 <- data.frame()
+for(g in levels(NMDS_t1$Hatchery)){
+  if(g!="" && (g %in% names(ord_t1))){
+    df_ell_t1 <- rbind(df_ell_t1,
+    cbind(as.data.frame(with(NMDS_t1[NMDS_t1$Hatchery==g,],                    veganCovEllipse(ord_t1[[g]]$cov,ord_t1[[g]]$center,ord_t1[[g]]$scale))),Hatchery=g))}}
+#Calculate p-value:
+adon_t1<-adonis2(Abun ~Hatchery, data=Meta, by=NULL,method="bray", k=2,permutations = 1000 )
+#Plot NMDS
+NMDS_t1 <- cbind(SampleID = rownames(NMDS_t1 ), NMDS_t1)
+rownames(SD1 ) <- NULL
+NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=Hatchery))+
+  annotate("text",x=min(NMDS_t1$NMDS1-1.8),y=min(NMDS_t1$NMDS2-1.6), 
+           label=paste("P value = 0.001"))+
+  annotate("text",x=min(NMDS_t1$NMDS1-1.9),y=min(NMDS_t1$NMDS2-1.9), 
+         label=paste("Stress=0.1"))+
+  geom_path(data=df_ell_t1, aes(x=NMDS1, y=NMDS2, linetype=Hatchery), size=1)+
+  scale_linetype_manual(values=c("VIMS"="solid","Mat"="dotted", "MK"="longdash","RWU"="dashed"))+
+  scale_colour_manual(values=c("VIMS"="orange","Mat"="cyan", "MK"="brown","RWU"="tomato"))+
+  ggtitle("By Hatchery")+
+  # add the points per sample. define shape based on Day
+  geom_point(aes(shape=Treatment), size=5) + scale_shape_manual(values=c(15,16)) +
+  # reorder the legend
+  guides(color = guide_legend(order=1),lty= guide_legend(order=1),
+         shape = guide_legend(order=2), legend.position = "NONE")
+NMDSplot_Hatchery <- NMDSplot_t3 + theme(axis.text.y = element_text(size="12", color="black"), axis.title.y = element_text(face="bold",size="12", color="black"))+
+theme(axis.text.x = element_text(size="12", color="black"), axis.title.x.bottom = element_text(face="bold",size="12", color="black"))+
+theme(axis.text.x.top= element_text(face="bold",size="12", color="black"))+theme(plot.title=element_text(size = 16, face = "bold", hjust = 0.5))
+NMDSplot_Hatchery
+
+## Plot all together
+All<-cowplot::plot_grid(NMDSplot_Location, NMDSplot_Hatchery, NMDSplot_Trial,NMDSplot_Season, NMDSplot_Year,NMDSplot_Treat,
+  labels = c('A', 'B', 'C','D','E','F'),
+  align= c("v","v","v","v","v","v"),
+  axis = c("l","r","l","r","l","r"),
+     ncol=3,
+  nrow = 2
+)
+All
+#ggsave(filename = "Mookplot.png", plot = Mook , width=20, height=20, units="cm", dpi = 400)
+
+```
+##Figure S5
+```{r}
+unique_taxa(justbacteria, treatment = 'Treatment')
+ps2A <- prune_taxa(taxa_sums(justbacteria) > 0, justbacteria)
+##Plot by treatment
+upsetda <- get_upset(obj=ps2A, factorNames="Treatment")
+By_Treatment <- upset(upsetda, sets=c("S4", "C"), sets.bar.color = c("orange","blue"),order.by = "freq", empty.intersections = "on",keep.order = TRUE,number.angles = 0, point.size = 2.5,line.size = 1,mainbar.y.label = "ASVs Intersections", sets.x.label = "ASV Per Treatment",text.scale = c(2, 2, 1.3, 1.3, 2, 2.5))
+
+By_Treatment
+```
+
+##Figure S6
+
+```{r}
+##Simpson's diversity
+(vibrio1 <- subset_taxa(justbacteria, Order== "Vibrionales"))
+vibrio1_10000 <- subset_samples(vibrio1, sample_sums(vibrio1) > 10000)
+vibrio1_rarefy <- rarefy_even_depth(vibrio1_10000, rngseed= 81, sample.size = min(sample_sums(vibrio1)))
+sample_data(vibrio1)$Trial <- factor(sample_data(vibrio1)$Trial, levels = c("T1", "T2", "T3", "T4","T5","T7","T8"))
+levels(sample_data(vibrio1)$Trial)
+Vibrio_rarefy <- rarefy_even_depth(vibrio1, rngseed= 81, min(sample_sums(vibrio1)))
+adiv <- data.frame(
+  "Chao1" = phyloseq::estimate_richness(vibrio1_rarefy, measures = "Chao1"),
+  "Shannon" = phyloseq::estimate_richness(vibrio1_rarefy, measures = "Shannon"),
+  "Simpson" = phyloseq::estimate_richness(vibrio1_rarefy, measures = "Simpson"),
+  "Status" = phyloseq::sample_data(vibrio1_rarefy)$Treatment)
+SD <- sample_data(vibrio1_10000) %>%
+    data.frame() %>%
+    select("Treatment","Trial", "Num","Type", "Name","Tank_Replicate") %>%
+    mutate_if(is.factor,as.character)
+SD1 <- cbind(SampleID = rownames(SD ), SD)
+adiv$Trial <-as.character(SD$Trial)
+adiv$Treatment <-as.character(SD$Treatment)
+adiv$Num <-as.character(SD$Num)
+adivC <- adiv %>% group_by(Num,Treatment, Trial) %>% summarise(mean_read=mean(Simpson), sd_read=sd(Simpson))
+
+Div_S <- ggplot(adivC, aes(as.factor(Treatment),mean_read)) +
+  geom_boxplot(aes(fill=factor(Treatment)),width=0.5)+
+  #geom_jitter()+
+  scale_fill_manual(values=c("blue", "orange","blue", "orange")) +
+  labs(y="Simpson's Diversity", x="Treatment", fill="Treatment")+theme_bw()+
+  theme(strip.text.x = element_text(size=12,face="bold"))+
+  theme(strip.background = element_rect(fill="gray85"))+
+  theme(axis.text.y = element_text(size="14", color="black"), axis.title.y = element_text(face="bold",size="14", color="black"))+theme(axis.text.x = element_text(size="12", color="black", angle = 0), axis.title.x.bottom = element_text(face="bold",size="14", color="black"))+theme(axis.text.x.top= element_text(face="bold",size="14", color="black"),
+        legend.position = "None",panel.spacing = unit(0.2, "mm"),               
+        panel.border = element_rect(fill=NA, colour = "black",size=1.5))+
+  scale_y_continuous(limits=c(0,1))
+Div_S
+
+##Stats
+## Run the model
+Simpsons_Div = lmer(mean_read ~ Trial*Treatment+(1|Tank_Replicate), data=adivC, REML = FALSE)
+summary(Simpsons_Div)
+plot(Simpsons_Div)
+## Run ANOVA on the model to determine statistical significance of the factors
+Anova(Simpsons_Div)
+emm.trajectory = emmeans(Simpsons_Div, ~ Treatment | Trial)
+Diversity_Comp = data.frame(contrast(emm.trajectory, interaction = "pairwise", adjust = "Bonferroni"))
+
+
+## Vibrio Abundance
+Vib_SD <- sample_data(justbacteria) %>%
+    data.frame() %>%
+    select("Treatment","Trial", "Num","Type", "Name","Tank_Replicate") %>%
+    mutate_if(is.factor,as.character)
+Vib_SD1 <- cbind(SampleID = rownames(Vib_SD ), Vib_SD)
+
+##Abundance
+Orderabundance <- justbacteria %>%
+tax_glom(taxrank = "Order") %>% # agglomerate at phylum level
+transform_sample_counts(function(x) {x/sum(x)*100}) %>% # Transform to rel. abundance
+  psmelt() %>%     
+  arrange(Order)
+all_order <- Orderabundance %>%group_by(Sample,Order,)%>%summarise(avg_abundance = mean(Abundance))
+Oder <-spread(all_order, Sample,avg_abundance) 
+Order <-Oder %>% remove_rownames %>% column_to_rownames(var="Order")
+Order1c<- as.data.frame(t(Order))
+Order1c<- cbind(SampleID = rownames(Order1c ), Order1c)
+rownames(Order1c) <- NULL
+
+trialorder_A <-as.data.frame(c(Vib_SD1, Order1c))
+trialorder1 <- group_by(trialorder_A,Treatment)
+trial_Vibrionales_means <- dplyr::summarise(trialorder1,
+                         meanvib = mean(Vibrionales, na.rm=TRUE),
+                         stdevvib = sd(Vibrionales, na.rm=TRUE))
+Vibrio_abun <- ggplot(trial_Vibrionales_means, aes(x = Treatment, y = meanvib, by=Treatment, fill= Treatment)) + geom_col(position = "dodge") +
+geom_errorbar(aes(ymin=meanvib-stdevvib, ymax=meanvib+stdevvib), width=.2, position=position_dodge(.9))+
+labs(y=" Percent Vibrio Taxa", x="Treatment") +
+scale_fill_manual(values=c("blue", "orange"), name= "Treatment",
+breaks=c("C", "S4"),
+labels=c("C", "S4")) +
+theme_bw()+
+  theme(panel.border = element_rect(fill=NA, colour = "black", 
+size=1.5))+
+scale_y_continuous(limits=c(-5,100))+
+theme(axis.text.y = element_text(size="14", color="black"), axis.title.y = element_text(face="bold",size="14", color="black"))+
+theme(axis.text.x = element_text(size="14", color="black"), axis.title.x.bottom = element_text(face="bold",size="14", color="black"))+
+theme(axis.text.x.top= element_text(face="bold",size="14", color="black"))+
+theme(legend.position = "None", legend.title=element_blank()) 
+Vibrio_abun
+
+Vibrionales.aov <- aov(trialorder1$Vibrionales ~ Treatment*Trial,  data = trialorder1 )
+summary(Vibrionales.aov)
+Vibrio_abun
+
+
+### NMDS plot for Vibrio genus
+
+vibrio1 <- subset_taxa(justbacteria, Order== "Vibrionales")
+Vib1 <- subset_samples(vibrio1, Name=="T1")
+GPA <- Vib1 %>% transform_sample_counts(function(x) {x/sum(x)})%>% psmelt()
+all_order <- GPA %>%group_by(Num,OTU)%>%summarise(avg_abundance = mean(Abundance))
+Oder <-spread(all_order, Num,avg_abundance) 
+Order <-Oder %>% remove_rownames %>% column_to_rownames(var="OTU")
+Abun <- as.data.frame(t(Order))
+
+Vib_Meta <- sample_data(Vib1) %>%
+    data.frame() %>%
+    select("Treatment","Trial", "Num","Type", "Name","Tank_Replicate") %>%
+    mutate_if(is.factor,as.character)
+Vib_Meta1 <- cbind(SampleID = rownames(Vib_Meta ), Vib_Meta)
+
+sample_sum_df <- data.frame(sum = sample_sums(Vib1))
+sum(sample_sum_df[, 'sum'])
+Sample_reads <- cbind(SampleID = rownames(sample_sum_df), sample_sum_df)
+rownames(Sample_reads) <- NULL
+
+all_SD <- full_join(Vib_Meta1,Sample_reads)
+rownames(all_SD ) <- NULL
+Meta <- all_SD %>%group_by(Num,Treatment,Trial,Tank_Replicate)%>%summarise(avg_abundance = mean(sum))
+Meta <- Meta %>% remove_rownames %>% column_to_rownames(var="Num")
+sol_t1 <-metaMDS(Abun ,distance = "bray", k = 2, trymax = 50)
+NMDS_t1=data.frame(NMDS1=sol_t1$point[,1],NMDS2=sol_t1$point[,2],
+                Treatment=as.factor(Meta[,1]),Tank_Replicate=as.factor(Meta[,2]))
+
+theme_set(theme_gray())
+
+plot.new()
+ord_t1<-ordiellipse(sol_t1, as.factor(Meta$Treatment),
+                    display = "sites", kind ="sd", conf = 0.95, label = T)
+dev.off()
+#Generate ellipse points 
+df_ell_t1 <- data.frame()
+for(g in levels(NMDS_t1$Treatment)){
+  if(g!="" && (g %in% names(ord_t1))){
+    df_ell_t1 <- rbind(df_ell_t1,
+    cbind(as.data.frame(with(NMDS_t1[NMDS_t1$Treatment==g,],                            veganCovEllipse(ord_t1[[g]]$cov,ord_t1[[g]]$center,ord_t1[[g]]$scale))),Treatment=g))}}
+
+#Calculate p-value:
+adon_t1<-adonis2(Abun ~Treatment, data=Meta, by=NULL,method="bray", k=2)
+
+#Plot NMDS
+NMDSplot_t3<-ggplot(data=NMDS_t1,aes(NMDS1,NMDS2,col=Treatment))+
+  annotate("text",x=min(NMDS_t1$NMDS1),y=min(NMDS_t1$NMDS2-0.5), 
+           label=paste("P value= 0.01"))+
+  annotate("text",x=min(NMDS_t1$NMDS1-0.003),y=min(NMDS_t1$NMDS2-0.6), 
+          label=paste("Stress=0.03"))+
+  # draw the ellipses
+  geom_path(data=df_ell_t1, aes(x=NMDS1, y=NMDS2, linetype=Treatment), size=1)+
+  scale_linetype_manual(values=c("C"="solid","S4"="dotted"))+
+  scale_colour_manual(values=c("C"="blue","S4"="orange"))+
+  ggtitle("Trial1,VIMS June 2019")+
+  geom_point(aes(shape=Treatment), size=5) + scale_shape_manual(values=c(15,16)) 
+NMDSplot_T1 <- NMDSplot_t3 + theme(axis.text.y = element_text(size="12", color="black"), axis.title.y = element_text(face="bold",size="12", color="black"))+
+theme(axis.text.x = element_text(size="12", color="black"), axis.title.x.bottom = element_text(face="bold",size="12", color="black"))+
+theme(axis.text.x.top= element_text(face="bold",size="12", color="black"))+theme(plot.title=element_text(size = 16, face = "bold", hjust = 0.5))
+NMDSplot_T1 
+```
+
+##Figure S7
+## Plot for Vibrio ASV abundance
+```{r, fig.width=6}
+Vib_Meta <- sample_data(vibrio1) %>%
+    data.frame() %>%
+    select("Treatment","Trial", "Num","Type", "Name","Hatchery") %>%
+    mutate_if(is.factor,as.character)
+Vib_Meta2 <- cbind(SampleID = rownames(Vib_Meta ), Vib_Meta)
+
+sample_sum_df <- data.frame(sum = sample_sums(vibrio1))
+sum(sample_sum_df[, 'sum'])
+Sample_reads <- cbind(SampleID = rownames(sample_sum_df), sample_sum_df)
+rownames(Sample_reads) <- NULL
+
+all_SD <- full_join(Vib_Meta2,Sample_reads)
+rownames(all_SD ) <- NULL
+Meta <- all_SD %>%group_by(Num,Treatment,Trial,Hatchery,Name)%>%summarise(avg_abundance = mean(sum))
+Meta$Treatment <- as.character(Meta$Treatment)
+Meta$Treatment <- factor(Meta$Treatment, levels=unique(Meta$Treatment))
+Meta$Name <- as.character(Meta$Name)
+Meta$Name <- factor(Meta$Name, levels=c("T1","T2","T3","T4","T5","T7","T8_NUV","T8_UV"))
+Meta$Hatchery <- as.character(Meta$Hatchery)
+Meta$Hatchery <- factor(Meta$Hatchery, levels=unique(Meta$Hatchery))
+
+
+(vibrio1 <- subset_taxa(ps2, Order== "Vibrionales"))
+vibrio2 <-psmelt(vibrio1) %>%as_tibble
+vibrio3 <- vibrio2 %>% group_by(Num,OTU) %>% summarise(Value=mean(Abundance))
+Md <-spread(vibrio3, Num, Value) 
+Me <-Md %>% remove_rownames %>% column_to_rownames(var="OTU")
+Me <-as.data.frame(t(Me))
+count_order<-Me/rowSums(Me)
+count_orderb <-count_order[,order(colSums(count_order),decreasing=TRUE)]
+N<-15 
+taxa_list<-colnames(count_orderb)[1:N]
+Order1d <-data.frame(count_orderb[,colnames(count_orderb) %in% taxa_list], Others=rowSums(count_orderb[,!colnames(count_orderb) %in% taxa_list]))
+Order1d_long <-gather(Order1d, SampleID, Value)
+Order1d_long$Taxa <-factor(Order1d_long$SampleID, levels = unique(Order1d_long$SampleID))
+Order1d_count<-as.data.frame(c(Meta, Order1d_long))
+Order1d_count$Treatment <- as.character(Order1d_count$Treatment)
+Order1d_count$Treatment <- factor(Order1d_count$Treatment, levels=unique(Order1d_count$Treatment))
+Order1d_count$Name <- as.character(Order1d_count$Name)
+Order1d_count$Name <- factor(Order1d_count$Name, levels=c("T1","T2","T3","T4","T5","T7","T8_NUV","T8_UV"))
+Order1d_count$Hatchery <- as.character(Order1d_count$Hatchery)
+Order1d_count$Hatchery <- factor(Order1d_count$Hatchery, levels=unique(Order1d_count$Hatchery))
+
+my_colors <- c("brown4","brown2","blue4","blue","chocolate2","aquamarine4","burlywood1","darkgoldenrod1","gold1","hotpink1","#808080","#94FFB5","#C84248","#8A7C64", "#599861","gray")
+
+Order_plot <- ggplot(Order1d_count)+
+  geom_col(mapping = aes(x = Num, y = Value, fill = Taxa), position = "fill", show.legend = TRUE)+
+  ylab("Percent Vibrio ASV Abundance") +
+ facet_nested(. ~Hatchery+Name+Treatment, scales = "free", switch = "x") +
+  theme(strip.background = element_rect(colour="black", size=1))+
+  theme(strip.text.x = element_text(size=16,face="bold"))+
+  scale_fill_manual(values = my_colors) +
+  xlab(NULL)+
+  scale_y_continuous(expand = c(0,0),labels=scales::percent)+
+  theme_minimal()+
+   theme(axis.text.x = element_blank()) +
+  theme(strip.background = element_rect(fill="gray85"),panel.spacing = unit(0.2,"lines"),axis.text.y.left = element_text(colour="black", size=16, face="bold"),
+        axis.title.y = element_text(size = 16, face="bold"),
+        title = element_text(size = 16, face="bold"))
+
+
+Read_plot <-ggplot(Meta,aes(Num,avg_abundance, fill=Treatment))+
+  geom_col()+theme_grey()+
+ facet_nested(. ~Hatchery+Name+Treatment, scales = "free", switch = "x") +
+  theme(strip.background = element_rect(colour="black", size=1))+
+  labs(y="Read Abundance", x=NULL)+
+  scale_fill_manual(values=c("gray67","gray5"))+
+  scale_y_continuous(expand = c(0,0),labels=scales::scientific_format(digits=1))+
+  theme(strip.text = element_blank(),legend.position="right",
+        axis.ticks.x = element_blank(),
+        panel.spacing = unit(0.2,"lines"),axis.text.x = element_blank())+
+  theme(strip.background = element_rect(fill="gray85"),panel.spacing = unit(0.2,"lines"),axis.text.y.left = element_text(colour="black", size=12, face="bold"),
+        axis.title.y = element_text(size = 12, face="bold"),
+        title = element_text(size = 12, face="bold"))+ theme(legend.position="right")+ theme(legend.title = element_text(colour="black", size=12))+ theme(legend.text = element_text(colour="black", size=12, face="bold"))
+
+g2 <- ggplotGrob(Read_plot)
+g3 <- ggplotGrob(Order_plot)
+g <- rbind(g2, g3, size = "first")
+g$widths <- unit.pmax(g2$widths, g3$widths)
+grid.newpage()
+grid.draw(g)
+```
+
+##Figure S8
+
+```{r}
+#library(ANCOMBC)
+UV <- subset_samples(UV_NonUV, Type=="UV")
+Orderabundance <- UV %>%
+tax_glom(taxrank = "Order")
+out <- ancombc(Orderabundance,formula = "Treatment", p_adj_method = "fdr", lib_cut = 1000, group = "Treatment", struc_zero = TRUE, neg_lb = TRUE, tol = 1e-5, max_iter = 100, conserve = TRUE, alpha = 0.05, 
+  global = TRUE 
+)
+res <- out$res
+Diff <- res$diff_abn
+Diff1 <- Diff%>%
+    data.frame() %>%
+    select("TreatmentS4") %>%
+    mutate_if(is.factor,as.character)
+Diff2 <- cbind(FeatureID = rownames(Diff1 ), Diff1)
+rownames(Diff2) <- NULL
+names(Diff2)[names(Diff2) == "TreatmentS4"] <- "Differential" 
+
+LFC <- res$beta
+names(LFC)[names(LFC) == "TreatmentS4"] <- "Logfoldchange" 
+LFC1 <- LFC%>%
+    data.frame() %>%
+    select("Logfoldchange") %>%
+    mutate_if(is.factor,as.character)
+LFC2 <- cbind(FeatureID = rownames(LFC1 ), LFC1)
+rownames(LFC2) <- NULL
+pval <- res$q_val
+pval <- cbind(FeatureID = rownames(pval ), pval)
+rownames(pval) <- NULL
+names(pval)[names(pval) == "TreatmentS4"] <- "pvalue" 
+Pvalue <-pval%>%
+    data.frame() %>%
+    select("FeatureID","pvalue") %>%
+    mutate_if(is.factor,as.character)
+stat <- full_join(LFC2, Pvalue)
+stat1 <- full_join(stat,Diff2)
+
+sigtab <- stat1 %>% filter(pvalue < 0.05)
+stat1 <- full_join(sigtab, taxa_A1)
+Order <-stat1 %>% remove_rownames %>% column_to_rownames(var="FeatureID")
+ANCOM_BC <- Order[1:14,]
+#write.csv(ANCOM_BC,"ANCOM_UV.csv")
+
+ANCOMBC_plot <- ggplot(ANCOM_BC,aes(x=Order,y=Logfoldchange,fill=Logfoldchange>0))+
+geom_col() + coord_flip()+
+scale_fill_manual(values=c("blue","orange"),
+labels=c("Control","S4"))+
+  ggtitle("UV")
+ANCOMBC_plotA <- ANCOMBC_plot +theme(axis.text.x = element_text(colour="black", size=12, face="bold")) +
+  theme(strip.background = element_rect(fill="gray85"),axis.text.y.left = element_text(colour="black", size=12, face="bold"),axis.text.y.right = element_text(colour="black", size=12, face="bold"),
+        axis.title.y = element_text(size = 12, face="bold"),axis.title.x = element_text(size = 12, face="bold", colour = "black"),title = element_text(size = 12, face="bold"))+
+  guides(fill=guide_legend(title="Treatment"))
+ANCOMBC_plotA
+```
+
+```{r, fig.width=5}
+NUV <- subset_samples(UV_NonUV, Type=="NUV")
+Orderabundance <- NUV %>%
+tax_glom(taxrank = "Order")
+out <- ancombc(Orderabundance,formula = "Treatment", p_adj_method = "fdr", lib_cut = 1000, group = "Treatment", struc_zero = TRUE, neg_lb = TRUE, tol = 1e-5, max_iter = 100, conserve = TRUE, alpha = 0.05, 
+  global = TRUE 
+)
+res <- out$res
+Diff <- res$diff_abn
+Diff1 <- Diff%>%
+    data.frame() %>%
+    select("TreatmentS4") %>%
+    mutate_if(is.factor,as.character)
+Diff2 <- cbind(FeatureID = rownames(Diff1 ), Diff1)
+rownames(Diff2) <- NULL
+names(Diff2)[names(Diff2) == "TreatmentS4"] <- "Differential" 
+
+LFC <- res$beta
+names(LFC)[names(LFC) == "TreatmentS4"] <- "Logfoldchange" 
+LFC1 <- LFC%>%
+    data.frame() %>%
+    select("Logfoldchange") %>%
+    mutate_if(is.factor,as.character)
+LFC2 <- cbind(FeatureID = rownames(LFC1 ), LFC1)
+rownames(LFC2) <- NULL
+pval <- res$q_val
+pval <- cbind(FeatureID = rownames(pval ), pval)
+rownames(pval) <- NULL
+names(pval)[names(pval) == "TreatmentS4"] <- "pvalue" 
+Pvalue <-pval%>%
+    data.frame() %>%
+    select("FeatureID","pvalue") %>%
+    mutate_if(is.factor,as.character)
+stat <- full_join(LFC2, Pvalue)
+stat1 <- full_join(stat,Diff2)
+
+sigtab <- stat1 %>% filter(pvalue < 0.05)
+stat1 <- full_join(sigtab, taxa_A1)
+Order <-stat1 %>% remove_rownames %>% column_to_rownames(var="FeatureID")
+ANCOM_BC <- Order[1:9,]
+#write.csv(ANCOM_BC,"ANCOM_NUV.csv")
+
+ANCOMBC_plot <- ggplot(ANCOM_BC,aes(x=Order,y=Logfoldchange,fill=Logfoldchange>0))+
+geom_col() + coord_flip()+
+scale_fill_manual(values=c("blue","orange"),
+labels=c("Control","S4"))+ggtitle("Non-UV")
+ANCOMBC_plotB <- ANCOMBC_plot +theme(axis.text.x = element_text(colour="black", size=12, face="bold")) +
+  theme(strip.background = element_rect(fill="gray85"),axis.text.y.left = element_text(colour="black", size=12, face="bold"),axis.text.y.right = element_text(colour="black", size=12, face="bold"),
+        axis.title.y = element_text(size = 12, face="bold"),axis.title.x = element_text(size = 12, face="bold", colour = "black"),title = element_text(size = 12, face="bold"))+
+  guides(fill=guide_legend(title="Treatment"))
+ANCOMBC_plotB
+
+(ANCOMBC_plotA | ANCOMBC_plotB) + plot_layout(guides = 'collect')
+
+```
