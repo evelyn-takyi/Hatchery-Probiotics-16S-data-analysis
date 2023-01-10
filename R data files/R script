@@ -15,7 +15,8 @@ library(microbiome)
 library(devtools) # Load the devtools package
 # library(ggh4x)
 ```
-## Load the data
+
+##Load the data
 ```{r}
 ##Count table
 abund_table <-read.xlsx("~/Desktop/Data.xlsx", sheet="table", rowNames = TRUE)
@@ -34,8 +35,7 @@ meta_table1$Treatment <- factor(meta_table1$Treatment, levels=unique(meta_table1
 meta_table1Trial <- as.character(meta_table1$Trial)
 meta_table1$Trial <- factor(meta_table1$Trial, levels=unique(meta_table1$Trial))
 
-
-##Read the taxonomy table
+## Read the taxonomy table
 taxa1<-read_excel("~/Desktop/Data.xlsx", sheet = "metadata")
 tax_table1 <-do.call(rbind, strsplit(as.character(taxa1$Taxon),";"))
 colnames(tax_table1) <-c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
@@ -74,6 +74,7 @@ combine_all <-full_join(Meta_T1,meta_table1)
 
 # Rename and reorder factors for plotting
 ## Reorder Trials
+
 ```{r}
 # Relabel the Trial
 levels(sample_data(justbacteria)$Trial)
