@@ -1,7 +1,7 @@
 ---
 title: "S4 Hatchery Microbiome Analysis"
 author: "Evelyn Takyi, updated by Rebecca Stevick"
-date: "2023-02-16"
+date: "2023-12-04"
 output:
   html_document:
     toc: yes
@@ -34,7 +34,7 @@ library(vegan)
 ```
 
 ```
-## This is vegan 2.5-7
+## This is vegan 2.6-4
 ```
 
 ```r
@@ -42,20 +42,19 @@ library(tidyverse)
 ```
 
 ```
-## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.1 ──
-```
-
-```
-## ✔ ggplot2 3.4.0     ✔ purrr   0.3.4
-## ✔ tibble  3.1.6     ✔ dplyr   1.0.8
-## ✔ tidyr   1.2.0     ✔ stringr 1.4.0
-## ✔ readr   2.1.2     ✔ forcats 0.5.1
+## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+## ✔ dplyr     1.1.0     ✔ readr     2.1.4
+## ✔ forcats   1.0.0     ✔ stringr   1.5.0
+## ✔ ggplot2   3.4.1     ✔ tibble    3.1.8
+## ✔ lubridate 1.9.2     ✔ tidyr     1.3.0
+## ✔ purrr     1.0.1
 ```
 
 ```
 ## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
 ## ✖ dplyr::filter() masks stats::filter()
 ## ✖ dplyr::lag()    masks stats::lag()
+## ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
 ```
 
 ```r
@@ -66,9 +65,7 @@ library(gridExtra)
 ```
 ## 
 ## Attaching package: 'gridExtra'
-```
-
-```
+## 
 ## The following object is masked from 'package:dplyr':
 ## 
 ##     combine
@@ -100,26 +97,18 @@ library(microbiome)
 ## 
 ##  Copyright (C) 2011-2021 Leo Lahti, 
 ##     Sudarshan Shetty et al. <microbiome.github.io>
-```
-
-```
+## 
 ## 
 ## Attaching package: 'microbiome'
-```
-
-```
+## 
 ## The following object is masked from 'package:ggplot2':
 ## 
 ##     alpha
-```
-
-```
+## 
 ## The following object is masked from 'package:vegan':
 ## 
 ##     diversity
-```
-
-```
+## 
 ## The following object is masked from 'package:base':
 ## 
 ##     transform
@@ -131,14 +120,9 @@ library(devtools)
 
 ```
 ## Loading required package: usethis
-```
-
-```
 ## 
 ## Attaching package: 'devtools'
-```
-
-```
+## 
 ## The following object is masked from 'package:permute':
 ## 
 ##     check
@@ -152,14 +136,9 @@ library(lme4)
 
 ```
 ## Loading required package: Matrix
-```
-
-```
 ## 
 ## Attaching package: 'Matrix'
-```
-
-```
+## 
 ## The following objects are masked from 'package:tidyr':
 ## 
 ##     expand, pack, unpack
@@ -171,20 +150,13 @@ library(car)
 
 ```
 ## Loading required package: carData
-```
-
-```
 ## 
 ## Attaching package: 'car'
-```
-
-```
+## 
 ## The following object is masked from 'package:dplyr':
 ## 
 ##     recode
-```
-
-```
+## 
 ## The following object is masked from 'package:purrr':
 ## 
 ##     some
@@ -197,9 +169,7 @@ library(emmeans)
 ```
 ## 
 ## Attaching package: 'emmeans'
-```
-
-```
+## 
 ## The following object is masked from 'package:devtools':
 ## 
 ##     test
@@ -434,7 +404,7 @@ Order_abundances <- justbacteria_12000_rarefy %>% tax_glom(taxrank = "Order") %>
   write.csv( Order_abundances, "Tables/order.csv")
    
    # start plotting
-   Order_abundances %>% ggplot() +
+Order_abundances %>% ggplot() +
    geom_col(aes(x = Num, y = sum_abun, fill = OrderOther), position="fill")+
    labs(y="Percent Order Abundance", x=NULL, fill="Order") +
    facet_nested(.~Hatchery+Name+Treatment, scales = "free", space="free", switch="x") +
@@ -482,7 +452,7 @@ adiv <- data.frame(
 ```
 
 ```
-## Joining, by = "SampleID"
+## Joining with `by = join_by(SampleID)`
 ```
 
 ```r
@@ -611,7 +581,7 @@ Average <- full_join(Avg_Chao1, Avg_Simp)
 ```
 
 ```
-## Joining, by = c("Num", "Trial", "Treatment", "Tank_Replicate")
+## Joining with `by = join_by(Num, Trial, Treatment, Tank_Replicate)`
 ```
 
 ```r
@@ -765,7 +735,7 @@ sol_t1 <-metaMDS(ASV_t1 ,distance = "bray", k = 2, trymax = 50)
 ## Run 20 stress 0.08643075 
 ## ... Procrustes: rmse 1.976794e-06  max resid 3.514027e-06 
 ## ... Similar to previous best
-## *** Solution reached
+## *** Best solution repeated 5 times
 ```
 
 ```r
@@ -946,7 +916,7 @@ sol_t2 <-metaMDS(ASV_t2 ,distance = "bray", k = 2, trymax = 50)
 ## Run 48 stress 0.01453034 
 ## Run 49 stress 0.07251169 
 ## Run 50 stress 0.07251169 
-## *** No convergence -- monoMDS stopping criteria:
+## *** Best solution was not repeated -- monoMDS stopping criteria:
 ##      6: no. of iterations >= maxit
 ##     30: stress < smin
 ##      4: stress ratio > sratmax
@@ -1082,7 +1052,7 @@ sol_t3 <- metaMDS(ASV_t3, distance = "bray", k = 2)
 ## Run 18 stress 0.09771568 
 ## Run 19 stress 0.09381851 
 ## Run 20 stress 0.09771541 
-## *** Solution reached
+## *** Best solution repeated 2 times
 ```
 
 ```r
@@ -1219,7 +1189,7 @@ sol_t4 <- metaMDS(ASV_t4, distance = "bray", k = 2)
 ## Run 18 stress 0.1664876 
 ## Run 19 stress 0.1289916 
 ## Run 20 stress 0.1289916 
-## *** Solution reached
+## *** Best solution repeated 5 times
 ```
 
 ```r
@@ -1359,7 +1329,7 @@ sol_t7 <- metaMDS(ASV_t7, distance = "bray", k = 2)
 ## ... Similar to previous best
 ## Run 19 stress 0.1580781 
 ## Run 20 stress 0.1329101 
-## *** Solution reached
+## *** Best solution repeated 2 times
 ```
 
 ```r
@@ -1499,7 +1469,7 @@ sol_t8 <- metaMDS(ASV_t8, distance = "bray", k = 2)
 ## Run 18 stress 0.1033958 
 ## Run 19 stress 0.07853362 
 ## Run 20 stress 0.1184472 
-## *** Solution reached
+## *** Best solution repeated 9 times
 ```
 
 ```r
@@ -1640,6 +1610,12 @@ library(MicrobiotaProcess) # BiocManager::install("MicrobiotaProcess")
 ```
 
 ```
+## Registered S3 method overwritten by 'ggtree':
+##   method      from 
+##   identify.gg ggfun
+```
+
+```
 ## MicrobiotaProcess v1.6.6 For help:
 ## https://github.com/YuLab-SMU/MicrobiotaProcess/issues
 ## 
@@ -1659,6 +1635,12 @@ library(MicrobiotaProcess) # BiocManager::install("MicrobiotaProcess")
 ```
 ## 
 ## Attaching package: 'MicrobiotaProcess'
+```
+
+```
+## The following object is masked from 'package:ggpubr':
+## 
+##     get_coord
 ```
 
 ```
@@ -1885,7 +1867,7 @@ stat <- full_join(LFC2, Pvalue)
 ```
 
 ```
-## Joining, by = "FeatureID"
+## Joining with `by = join_by(FeatureID)`
 ```
 
 ```r
@@ -1893,7 +1875,7 @@ stat1 <- full_join(stat,Diff2)
 ```
 
 ```
-## Joining, by = "FeatureID"
+## Joining with `by = join_by(FeatureID)`
 ```
 
 ```r
@@ -1908,7 +1890,7 @@ ANCOM_BC1 <- sigtab %>% left_join(as.data.frame(phyloseq::tax_table(justbacteria
 ```
 
 ```
-## Joining, by = "FeatureID"
+## Joining with `by = join_by(FeatureID)`
 ```
 
 ```r
@@ -2142,7 +2124,7 @@ sol_NUV_UV <- metaMDS(ASV_NUV_UV, distance = "bray", k = 2)
 ## Run 20 stress 0.07266155 
 ## ... Procrustes: rmse 1.359699e-05  max resid 2.670852e-05 
 ## ... Similar to previous best
-## *** Solution reached
+## *** Best solution repeated 9 times
 ```
 
 ```r
@@ -2307,6 +2289,98 @@ pairwiseAdonis::pairwise.adonis2(ASV_NUV_UV ~Type, data=Meta_NUV_UV, by=NULL,met
 ## [1] "pwadstrata" "list"
 ```
 
+# Figure 7 - Correlation analysis
+
+
+```r
+# import metadata table
+Performance_data <-read.xlsx("Data.xlsx", sheet="performance_data", rowNames = TRUE) 
+
+# select samples for correlation analysis
+ASV_corr <- subset_samples(justbacteria_12000_rarefy, Trial %in% c("T1","T2","T3","T4","T6","T7")) %>%
+   psmelt() %>% arrange(OTU) %>% 
+   group_by(Num,Treatment,Name,Hatchery,OTU) %>% 
+   summarise(avg_abundance = mean(Abundance)) %>%  # average by tank
+   spread(OTU,avg_abundance) 
+```
+
+```
+## `summarise()` has grouped output by 'Num', 'Treatment', 'Name', 'Hatchery'. You
+## can override using the `.groups` argument.
+```
+
+```r
+# perform correlation analysis with survival and growth rate data
+correlation.table <- associate(data.frame(Performance_data$Percentage_Survival,
+                                             Performance_data$Growth_rate_mm),
+                               ASV_corr[5:2503],
+                               method = "spearman", mode = "table", 
+                               p.adj.threshold = 0.05, n.signif = 1)
+names(correlation.table)[2]<-paste("FeatureID")
+
+# clean up correlation table ASV names
+correlation.table.edit <- correlation.table %>% 
+   left_join(as.data.frame(phyloseq::tax_table(justbacteria_12000_rarefy)) %>%
+                rownames_to_column("FeatureID")) %>% 
+   mutate(Class=str_remove(Class, "c__"),
+          Genus=str_remove(Genus, "g__"),
+          Taxa=paste(FeatureID, Class, Genus, sep="_")) %>% 
+   # filter correlation coefficients greater than 0.5
+   filter(abs(Correlation)>0.5) %>% 
+   # rename X1 to correlation metadata fields
+   mutate(performance = case_when(X1 == "Performance_data.Growth_rate_mm" ~ "Growth Rate",
+                       X1 == "Performance_data.Percentage_Survival" ~ "Percentage Survival")) %>% 
+   select(performance, FeatureID, Taxa, Order, Genus, Correlation, p.adj)
+```
+
+```
+## Joining with `by = join_by(FeatureID)`
+```
+
+```r
+# write table
+write.csv(correlation.table.edit, "Tables/Performance_CorrelationASVs.csv")
+
+# find taxa that are correlated with both metrics
+correlation.table.edit %>% ungroup() %>% 
+   spread(performance, Correlation) %>% 
+   group_by(FeatureID) %>% 
+   fill(`Growth Rate`,`Percentage Survival`) %>% 
+   drop_na() -> correlated.common 
+write.csv(correlated.common, "Tables/Performance_CorrelationASVs_common.csv")
+
+correlation.table.edit  %>% 
+   # filter only positive correlations
+   filter(FeatureID %in% correlated.common$FeatureID) %>% 
+   # start plotting
+   ggplot(aes(x = performance, y = reorder(Taxa,Correlation), fill = Correlation))+
+   geom_tile(color="white")+
+   scale_fill_gradientn("Correlation",
+                       breaks = seq(from = -1, to = 1, by = 0.2),
+                   colours = c("deeppink1", "deeppink4","white","turquoise4", "turquoise1"), 
+                   limits = c(-1,1))+
+   theme(axis.text.x=element_text(angle = 90))+
+   labs(x="Larval Performance", y=NULL) +
+   theme(axis.text.y = element_text(size="18", color="black",face="bold"), 
+         axis.title.y = element_text(face="bold",size="14", color="black"),
+         axis.text.x = element_text(size="18", color="black",face="bold", hjust=1), 
+         axis.title.x.bottom = element_text(face="bold",size="14", color="black"),
+         axis.text.x.top= element_text(face="bold",size="12", color="black"),
+         plot.title=element_text(size = 16, face = "bold", hjust = 0.5),
+         legend.text = element_text(size="14", color="black"),
+         legend.title = element_text(size="18", color="black",face="bold"),
+         legend.key.height = unit(2, "cm"))
+```
+
+![](Final_analysis_S4microbiome_files/figure-html/correlation-1.png)<!-- -->
+
+```r
+ggsave("Figures/Figure7.png", width=12, height=8, dpi=400)
+```
+
+
+
+
 # Figure S1 - Rarefaction curves
 
 ## All data
@@ -2381,9 +2455,11 @@ pairwiseAdonis::pairwise.adonis2(ASV_NUV_UV ~Type, data=Meta_NUV_UV, by=NULL,met
 
 ```r
 # rarefied number of taxa per sample
-Srare <- vegan::rarefy(t(otu_table(justbacteria)), raremax)
-# slope at the end of the rarefacetion curve per sample
-Sslope <- vegan::rareslope(t(otu_table(justbacteria)), raremax)
+tab <- t(otu_table(justbacteria))
+class(tab) <- "matrix" # as.matrix() will do nothing
+Srare <- vegan::rarefy(tab, raremax)
+# slope at the end of the rarefaction curve per sample
+Sslope <- vegan::rareslope(tab, raremax)
 
 # plot observed vs rarefied number of ASVs
 plot(S, Srare, xlab = "Observed No. of ASVs", ylab = "Rarefied No. of ASVs")
@@ -2401,7 +2477,7 @@ plot(S, Sslope, xlab = "Observed No. of ASVs", ylab = "Slope at rarefied sample 
 
 ```r
 # store rarefaction curves data with 100 steps
-rarecurve_data <- rarecurve(t(otu_table(justbacteria)), step = 100, sample = raremax)
+rarecurve_data <- rarecurve(tab, step = 100, sample = raremax)
 ```
 
 ![](Final_analysis_S4microbiome_files/figure-html/rarefactioncurve1-3.png)<!-- -->
@@ -2426,7 +2502,7 @@ rarecurvealldata <- map_dfr(rarecurve_data, bind_rows) %>%
 ```
 
 ```
-## Joining, by = "SampleID"
+## Joining with `by = join_by(SampleID)`
 ```
 
 ```r
@@ -2506,9 +2582,11 @@ rarecurvealldata
 
 ```r
 # rarefied number of taxa per sample
-Srare <- vegan::rarefy(t(otu_table(justbacteria_12000_rarefy)), raremax)
-# slope at the end of the rarefacetion curve per sample
-Sslope <- vegan::rareslope(t(otu_table(justbacteria_12000_rarefy)), raremax)
+tab <- t(otu_table(justbacteria_12000_rarefy))
+class(tab) <- "matrix" # as.matrix() will do nothing
+Srare <- vegan::rarefy(tab, raremax)
+# slope at the end of the rarefaction curve per sample
+Sslope <- vegan::rareslope(tab, raremax)
 
 # plot observed vs rarefied number of ASVs
 plot(S, Srare, xlab = "Observed No. of ASVs", ylab = "Rarefied No. of ASVs")
@@ -2526,7 +2604,7 @@ plot(S, Sslope, xlab = "Observed No. of ASVs", ylab = "Slope at rarefied sample 
 
 ```r
 # store rarefaction curves data with 100 steps
-rarecurve_data <- rarecurve(t(otu_table(justbacteria_12000_rarefy)), step = 100, sample = raremax)
+rarecurve_data <- rarecurve(tab, step = 100, sample = raremax)
 ```
 
 ![](Final_analysis_S4microbiome_files/figure-html/rarefactioncurve2-3.png)<!-- -->
@@ -2551,7 +2629,7 @@ rarecurveraredata <- map_dfr(rarecurve_data, bind_rows) %>%
 ```
 
 ```
-## Joining, by = "SampleID"
+## Joining with `by = join_by(SampleID)`
 ```
 
 ```r
@@ -2827,7 +2905,7 @@ sol_all <- metaMDS(ASV_all, distance = "bray", k = 2)
 ## ... Similar to previous best
 ## Run 19 stress 0.0956069 
 ## Run 20 stress 0.0956069 
-## *** Solution reached
+## *** Best solution repeated 4 times
 ```
 
 ```r
@@ -3277,7 +3355,7 @@ sol_t1_vibrio <-metaMDS(ASV_t1_vibrio ,distance = "bray", k = 2, trymax = 50)
 ## Run 20 stress 0.09563352 
 ## ... Procrustes: rmse 0.0005869972  max resid 0.001220331 
 ## ... Similar to previous best
-## *** Solution reached
+## *** Best solution repeated 3 times
 ```
 
 ```r
@@ -3412,7 +3490,7 @@ sol_t4_vibrio <-metaMDS(ASV_t4_vibrio ,distance = "bray", k = 2, trymax = 50)
 ## Run 21 stress 0.1468016 
 ## ... Procrustes: rmse 7.544091e-06  max resid 1.394432e-05 
 ## ... Similar to previous best
-## *** Solution reached
+## *** Best solution repeated 1 times
 ```
 
 ```r
@@ -3575,19 +3653,19 @@ vibrioabundances
 ```
 ## # A tibble: 57 × 8
 ## # Groups:   Num, Treatment, Trial, Tank_Replicate, Hatchery [57]
-##      Num Treatment Trial Tank_Replicate Hatchery Name  VibrioAbundance
-##    <dbl> <chr>     <fct> <chr>          <fct>    <fct>           <dbl>
-##  1     1 C         T1    A              VIMS     T1              1206.
-##  2     2 C         T1    B              VIMS     T1              1597.
-##  3     3 C         T1    C              VIMS     T1              1899.
-##  4     4 S4        T1    A              VIMS     T1              4994.
-##  5     5 S4        T1    B              VIMS     T1              7364.
-##  6     6 S4        T1    C              VIMS     T1              3966.
-##  7     7 S4        T1    D              VIMS     T1              1295 
-##  8     8 S4        T1    E              VIMS     T1               393.
-##  9     9 S4        T1    F              VIMS     T1               485.
-## 10    10 C         T2    A              VIMS     T2               532.
-## # … with 47 more rows, and 1 more variable: VibrioPercent <dbl>
+##      Num Treatment Trial Tank_Replicate Hatchery Name  VibrioAbundance VibrioP…¹
+##    <dbl> <chr>     <fct> <chr>          <fct>    <fct>           <dbl>     <dbl>
+##  1     1 C         T1    A              VIMS     T1              1206.      9.54
+##  2     2 C         T1    B              VIMS     T1              1597.     12.6 
+##  3     3 C         T1    C              VIMS     T1              1899.     15.0 
+##  4     4 S4        T1    A              VIMS     T1              4994.     39.5 
+##  5     5 S4        T1    B              VIMS     T1              7364.     58.3 
+##  6     6 S4        T1    C              VIMS     T1              3966.     31.4 
+##  7     7 S4        T1    D              VIMS     T1              1295      10.2 
+##  8     8 S4        T1    E              VIMS     T1               393.      3.11
+##  9     9 S4        T1    F              VIMS     T1               485.      3.84
+## 10    10 C         T2    A              VIMS     T2               532.      4.21
+## # … with 47 more rows, and abbreviated variable name ¹​VibrioPercent
 ```
 
 ```r
@@ -3667,8 +3745,8 @@ sigtab <- full_join(LFC2, Pvalue) %>%
 ```
 
 ```
-## Joining, by = "FeatureID"
-## Joining, by = "FeatureID"
+## Joining with `by = join_by(FeatureID)`
+## Joining with `by = join_by(FeatureID)`
 ```
 
 ```r
@@ -3680,7 +3758,7 @@ UV_df <- full_join(sigtab, as.data.frame(phyloseq::tax_table(justbacteria_12000_
 ```
 
 ```
-## Joining, by = "FeatureID"
+## Joining with `by = join_by(FeatureID)`
 ```
 
 ```r
@@ -3790,8 +3868,8 @@ sigtab <- full_join(LFC2, Pvalue) %>%
 ```
 
 ```
-## Joining, by = "FeatureID"
-## Joining, by = "FeatureID"
+## Joining with `by = join_by(FeatureID)`
+## Joining with `by = join_by(FeatureID)`
 ```
 
 ```r
@@ -3803,7 +3881,7 @@ NUV_df <- full_join(sigtab, as.data.frame(phyloseq::tax_table(justbacteria_12000
 ```
 
 ```
-## Joining, by = "FeatureID"
+## Joining with `by = join_by(FeatureID)`
 ```
 
 ```r
@@ -3894,19 +3972,18 @@ session_info()
 ##  collate  en_US.UTF-8
 ##  ctype    en_US.UTF-8
 ##  tz       Europe/Paris
-##  date     2023-02-16
+##  date     2023-12-04
 ##  pandoc   2.17.1.1 @ /Applications/RStudio.app/Contents/MacOS/quarto/bin/ (via rmarkdown)
 ## 
 ## ─ Packages ───────────────────────────────────────────────────────────────────
 ##  package              * version    date (UTC) lib source
 ##  abind                  1.4-5      2016-07-21 [1] CRAN (R 4.1.0)
-##  ade4                   1.7-18     2021-09-16 [1] CRAN (R 4.1.0)
+##  ade4                   1.7-22     2023-02-06 [1] CRAN (R 4.1.2)
 ##  agricolae            * 1.3-5      2021-06-06 [1] CRAN (R 4.1.0)
 ##  AlgDesign              1.2.1      2022-05-25 [1] CRAN (R 4.1.2)
 ##  ANCOMBC                1.4.0      2021-10-26 [1] Bioconductor
-##  ape                    5.6-2      2022-03-02 [1] CRAN (R 4.1.2)
-##  aplot                  0.1.2      2022-01-10 [1] CRAN (R 4.1.2)
-##  assertthat             0.2.1      2019-03-21 [1] CRAN (R 4.1.0)
+##  ape                    5.7        2023-02-16 [1] CRAN (R 4.1.2)
+##  aplot                  0.1.9      2022-11-24 [1] CRAN (R 4.1.2)
 ##  backports              1.4.1      2021-12-13 [1] CRAN (R 4.1.0)
 ##  beeswarm               0.4.0      2021-06-01 [1] CRAN (R 4.1.0)
 ##  Biobase                2.54.0     2021-10-26 [1] Bioconductor
@@ -3914,84 +3991,81 @@ session_info()
 ##  biomformat             1.22.0     2021-10-26 [1] Bioconductor
 ##  Biostrings             2.62.0     2021-10-26 [1] Bioconductor
 ##  bitops                 1.0-7      2021-04-24 [1] CRAN (R 4.1.0)
-##  boot                   1.3-28     2021-05-03 [1] CRAN (R 4.1.3)
-##  brio                   1.1.3      2021-11-30 [1] CRAN (R 4.1.0)
-##  broom                  0.7.12     2022-01-28 [1] CRAN (R 4.1.2)
-##  bslib                  0.3.1      2021-10-06 [1] CRAN (R 4.1.0)
+##  boot                   1.3-28.1   2022-11-22 [1] CRAN (R 4.1.2)
+##  broom                  1.0.3      2023-01-25 [1] CRAN (R 4.1.2)
+##  bslib                  0.4.2      2022-12-16 [1] CRAN (R 4.1.2)
 ##  cachem                 1.0.6      2021-08-19 [1] CRAN (R 4.1.0)
-##  callr                  3.7.0      2021-04-20 [1] CRAN (R 4.1.0)
-##  car                  * 3.0-12     2021-11-06 [1] CRAN (R 4.1.0)
+##  callr                  3.7.3      2022-11-02 [1] CRAN (R 4.1.2)
+##  car                  * 3.1-1      2022-10-19 [1] CRAN (R 4.1.2)
 ##  carData              * 3.0-5      2022-01-06 [1] CRAN (R 4.1.2)
 ##  cellranger             1.1.0      2016-07-27 [1] CRAN (R 4.1.0)
-##  class                  7.3-20     2022-01-16 [1] CRAN (R 4.1.3)
-##  classInt               0.4-3      2020-04-07 [1] CRAN (R 4.1.0)
-##  cli                    3.4.1      2022-09-23 [1] CRAN (R 4.1.2)
-##  cluster                2.1.3      2022-03-28 [1] CRAN (R 4.1.2)
+##  class                  7.3-21     2023-01-23 [1] CRAN (R 4.1.2)
+##  classInt               0.4-8      2022-09-29 [1] CRAN (R 4.1.2)
+##  cli                    3.6.0      2023-01-09 [1] CRAN (R 4.1.2)
+##  cluster                2.1.4      2022-08-22 [1] CRAN (R 4.1.2)
 ##  coda                   0.19-4     2020-09-30 [1] CRAN (R 4.1.0)
-##  codetools              0.2-18     2020-11-04 [1] CRAN (R 4.1.3)
+##  codetools              0.2-19     2023-02-01 [1] CRAN (R 4.1.2)
 ##  coin                   1.4-2      2021-10-08 [1] CRAN (R 4.1.0)
-##  colorspace             2.0-3      2022-02-21 [1] CRAN (R 4.1.2)
+##  colorspace             2.1-0      2023-01-23 [1] CRAN (R 4.1.2)
 ##  combinat               0.0-8      2012-10-29 [1] CRAN (R 4.1.0)
-##  crayon                 1.5.1      2022-03-26 [1] CRAN (R 4.1.2)
-##  data.table             1.14.2     2021-09-27 [1] CRAN (R 4.1.0)
-##  DBI                    1.1.2      2021-12-20 [1] CRAN (R 4.1.0)
-##  dbplyr                 2.1.1      2021-04-06 [1] CRAN (R 4.1.0)
+##  crayon                 1.5.2      2022-09-29 [1] CRAN (R 4.1.2)
+##  data.table             1.14.8     2023-02-17 [1] CRAN (R 4.1.2)
+##  DBI                    1.1.3      2022-06-18 [1] CRAN (R 4.1.2)
 ##  DelayedArray           0.20.0     2021-10-26 [1] Bioconductor
-##  desc                   1.4.1      2022-03-06 [1] CRAN (R 4.1.2)
-##  devtools             * 2.4.3      2021-11-30 [1] CRAN (R 4.1.0)
-##  digest                 0.6.29     2021-12-01 [1] CRAN (R 4.1.0)
-##  dplyr                * 1.0.8      2022-02-08 [1] CRAN (R 4.1.2)
-##  e1071                  1.7-9      2021-09-16 [1] CRAN (R 4.1.0)
+##  devtools             * 2.4.5      2022-10-11 [1] CRAN (R 4.1.2)
+##  digest                 0.6.31     2022-12-11 [1] CRAN (R 4.1.2)
+##  dplyr                * 1.1.0      2023-01-29 [1] CRAN (R 4.1.2)
+##  e1071                  1.7-13     2023-02-01 [1] CRAN (R 4.1.2)
 ##  ellipsis               0.3.2      2021-04-29 [1] CRAN (R 4.1.0)
-##  emmeans              * 1.8.3      2022-12-06 [1] CRAN (R 4.1.2)
+##  emmeans              * 1.8.4-1    2023-01-17 [1] CRAN (R 4.1.2)
 ##  estimability           1.4.1      2022-08-05 [1] CRAN (R 4.1.2)
-##  evaluate               0.15       2022-02-18 [1] CRAN (R 4.1.2)
-##  fansi                  1.0.3      2022-03-24 [1] CRAN (R 4.1.2)
-##  farver                 2.1.0      2021-02-28 [1] CRAN (R 4.1.0)
+##  evaluate               0.20       2023-01-17 [1] CRAN (R 4.1.2)
+##  fansi                  1.0.4      2023-01-22 [1] CRAN (R 4.1.2)
+##  farver                 2.1.1      2022-07-06 [1] CRAN (R 4.1.2)
 ##  fastmap                1.1.0      2021-01-25 [1] CRAN (R 4.1.0)
-##  forcats              * 0.5.1      2021-01-27 [1] CRAN (R 4.1.0)
+##  forcats              * 1.0.0      2023-01-29 [1] CRAN (R 4.1.2)
 ##  foreach                1.5.2      2022-02-02 [1] CRAN (R 4.1.2)
-##  formatR                1.11       2021-06-01 [1] CRAN (R 4.1.0)
-##  fs                     1.5.2      2021-12-08 [1] CRAN (R 4.1.0)
+##  formatR                1.14       2023-01-17 [1] CRAN (R 4.1.2)
+##  fs                     1.6.1      2023-02-06 [1] CRAN (R 4.1.2)
 ##  futile.logger        * 1.4.3      2016-07-10 [1] CRAN (R 4.1.0)
 ##  futile.options         1.0.1      2018-04-20 [1] CRAN (R 4.1.0)
-##  generics               0.1.2      2022-01-31 [1] CRAN (R 4.1.2)
+##  generics               0.1.3      2022-07-05 [1] CRAN (R 4.1.2)
 ##  GenomeInfoDb           1.30.1     2022-01-30 [1] Bioconductor
 ##  GenomeInfoDbData       1.2.7      2022-03-30 [1] Bioconductor
 ##  GenomicRanges          1.46.1     2021-11-18 [1] Bioconductor
 ##  ggbeeswarm             0.7.1      2022-12-16 [1] CRAN (R 4.1.2)
-##  ggforce                0.3.3      2021-03-05 [1] CRAN (R 4.1.0)
-##  ggfun                  0.0.5      2022-01-20 [1] CRAN (R 4.1.2)
+##  ggforce                0.4.1      2022-10-04 [1] CRAN (R 4.1.2)
+##  ggfun                  0.0.9      2022-11-21 [1] CRAN (R 4.1.2)
 ##  ggh4x                * 0.2.3.9000 2023-01-17 [1] Github (teunbrand/ggh4x@e240d75)
 ##  ggnewscale             0.4.8      2022-10-06 [1] CRAN (R 4.1.2)
-##  ggplot2              * 3.4.0      2022-11-04 [1] CRAN (R 4.1.2)
+##  ggplot2              * 3.4.1      2023-02-10 [1] CRAN (R 4.1.2)
 ##  ggplotify              0.1.0      2021-09-02 [1] CRAN (R 4.1.0)
-##  ggpubr               * 0.4.0      2020-06-27 [1] CRAN (R 4.1.0)
-##  ggraph                 2.0.5      2021-02-23 [1] CRAN (R 4.1.0)
-##  ggrepel                0.9.1      2021-01-15 [1] CRAN (R 4.1.0)
-##  ggsignif               0.6.3      2021-09-09 [1] CRAN (R 4.1.0)
+##  ggpubr               * 0.6.0      2023-02-10 [1] CRAN (R 4.1.2)
+##  ggraph                 2.1.0      2022-10-09 [1] CRAN (R 4.1.2)
+##  ggrepel                0.9.3      2023-02-03 [1] CRAN (R 4.1.2)
+##  ggsignif               0.6.4      2022-10-13 [1] CRAN (R 4.1.2)
 ##  ggstar                 1.0.4      2022-11-08 [1] CRAN (R 4.1.2)
 ##  ggtree                 3.2.1      2021-11-16 [1] Bioconductor
 ##  ggtreeExtra            1.4.2      2022-03-10 [1] Bioconductor
 ##  glue                   1.6.2      2022-02-24 [1] CRAN (R 4.1.2)
-##  graphlayouts           0.8.0      2022-01-03 [1] CRAN (R 4.1.2)
+##  graphlayouts           0.8.4      2022-11-24 [1] CRAN (R 4.1.2)
 ##  gridExtra            * 2.3        2017-09-09 [1] CRAN (R 4.1.0)
 ##  gridGraphics           0.5-1      2020-12-13 [1] CRAN (R 4.1.0)
-##  gtable                 0.3.0      2019-03-25 [1] CRAN (R 4.1.0)
-##  haven                  2.4.3      2021-08-04 [1] CRAN (R 4.1.0)
-##  highr                  0.9        2021-04-16 [1] CRAN (R 4.1.0)
-##  hms                    1.1.1      2021-09-26 [1] CRAN (R 4.1.0)
-##  htmltools              0.5.2      2021-08-25 [1] CRAN (R 4.1.0)
-##  httpuv                 1.6.5      2022-01-05 [1] CRAN (R 4.1.2)
-##  httr                   1.4.2      2020-07-20 [1] CRAN (R 4.1.0)
-##  igraph                 1.2.11     2022-01-04 [1] CRAN (R 4.1.2)
+##  gtable                 0.3.1      2022-09-01 [1] CRAN (R 4.1.2)
+##  haven                  2.5.1      2022-08-22 [1] CRAN (R 4.1.2)
+##  highr                  0.10       2022-12-22 [1] CRAN (R 4.1.2)
+##  hms                    1.1.2      2022-08-19 [1] CRAN (R 4.1.2)
+##  htmltools              0.5.4      2022-12-07 [1] CRAN (R 4.1.2)
+##  htmlwidgets            1.6.1      2023-01-07 [1] CRAN (R 4.1.2)
+##  httpuv                 1.6.9      2023-02-14 [1] CRAN (R 4.1.2)
+##  igraph                 1.4.0      2023-02-10 [1] CRAN (R 4.1.2)
 ##  IRanges                2.28.0     2021-10-26 [1] Bioconductor
 ##  iterators              1.0.14     2022-02-05 [1] CRAN (R 4.1.2)
 ##  jquerylib              0.1.4      2021-04-26 [1] CRAN (R 4.1.0)
-##  jsonlite               1.8.0      2022-02-22 [1] CRAN (R 4.1.2)
+##  jsonlite               1.8.4      2022-12-06 [1] CRAN (R 4.1.2)
 ##  KernSmooth             2.23-20    2021-05-03 [1] CRAN (R 4.1.3)
 ##  klaR                   1.7-1      2022-06-27 [1] CRAN (R 4.1.2)
-##  knitr                  1.38       2022-03-25 [1] CRAN (R 4.1.2)
+##  knitr                  1.42       2023-01-25 [1] CRAN (R 4.1.2)
 ##  labeling               0.4.2      2020-10-20 [1] CRAN (R 4.1.0)
 ##  labelled               2.10.0     2022-09-14 [1] CRAN (R 4.1.2)
 ##  lambda.r               1.2.4      2019-09-18 [1] CRAN (R 4.1.0)
@@ -4000,111 +4074,111 @@ session_info()
 ##  lazyeval               0.2.2      2019-03-15 [1] CRAN (R 4.1.0)
 ##  libcoin                1.0-9      2021-09-27 [1] CRAN (R 4.1.0)
 ##  lifecycle              1.0.3      2022-10-07 [1] CRAN (R 4.1.2)
-##  lme4                 * 1.1-28     2022-02-05 [1] CRAN (R 4.1.2)
-##  lubridate              1.8.0      2021-10-07 [1] CRAN (R 4.1.0)
+##  lme4                 * 1.1-31     2022-11-01 [1] CRAN (R 4.1.2)
+##  lubridate            * 1.9.2      2023-02-10 [1] CRAN (R 4.1.2)
 ##  magrittr               2.0.3      2022-03-30 [1] CRAN (R 4.1.3)
-##  MASS                   7.3-56     2022-03-23 [1] CRAN (R 4.1.2)
+##  MASS                   7.3-58.2   2023-01-23 [1] CRAN (R 4.1.2)
 ##  Matrix               * 1.4-1      2022-03-23 [1] CRAN (R 4.1.2)
 ##  MatrixGenerics         1.6.0      2021-10-26 [1] Bioconductor
-##  matrixStats            0.61.0     2021-09-17 [1] CRAN (R 4.1.0)
+##  matrixStats            0.63.0     2022-11-18 [1] CRAN (R 4.1.2)
 ##  memoise                2.0.1      2021-11-26 [1] CRAN (R 4.1.0)
-##  mgcv                   1.8-39     2022-02-24 [1] CRAN (R 4.1.3)
+##  mgcv                   1.8-41     2022-10-21 [1] CRAN (R 4.1.2)
 ##  microbiome           * 1.16.0     2021-10-26 [1] Bioconductor
 ##  MicrobiotaProcess    * 1.6.6      2022-04-07 [1] Bioconductor
 ##  mime                   0.12       2021-09-28 [1] CRAN (R 4.1.0)
 ##  miniUI                 0.1.1.1    2018-05-18 [1] CRAN (R 4.1.0)
-##  minqa                  1.2.4      2014-10-09 [1] CRAN (R 4.1.0)
-##  modelr                 0.1.8      2020-05-19 [1] CRAN (R 4.1.0)
+##  minqa                  1.2.5      2022-10-19 [1] CRAN (R 4.1.2)
 ##  modeltools             0.2-23     2020-03-05 [1] CRAN (R 4.1.0)
-##  multcomp               1.4-18     2022-01-04 [1] CRAN (R 4.1.2)
+##  multcomp               1.4-22     2023-02-10 [1] CRAN (R 4.1.2)
 ##  multtest               2.50.0     2021-10-26 [1] Bioconductor
 ##  munsell                0.5.0      2018-06-12 [1] CRAN (R 4.1.0)
 ##  mvtnorm                1.1-3      2021-10-08 [1] CRAN (R 4.1.0)
-##  nlme                   3.1-157    2022-03-25 [1] CRAN (R 4.1.2)
-##  nloptr                 2.0.0      2022-01-26 [1] CRAN (R 4.1.2)
-##  openxlsx             * 4.2.5      2021-12-14 [1] CRAN (R 4.1.0)
+##  nlme                   3.1-162    2023-01-31 [1] CRAN (R 4.1.2)
+##  nloptr                 2.0.3      2022-05-26 [1] CRAN (R 4.1.2)
+##  openxlsx             * 4.2.5.2    2023-02-06 [1] CRAN (R 4.1.2)
 ##  pairwiseAdonis         0.4.1      2023-02-16 [1] Github (pmartinezarbizu/pairwiseAdonis@68468fe)
-##  patchwork            * 1.1.1      2020-12-17 [1] CRAN (R 4.1.0)
+##  patchwork            * 1.1.2      2022-08-19 [1] CRAN (R 4.1.2)
 ##  permute              * 0.9-7      2022-01-27 [1] CRAN (R 4.1.2)
 ##  phyloseq             * 1.38.0     2021-10-26 [1] Bioconductor
 ##  phylosmith           * 1.0.6      2023-02-16 [1] Github (schuyler-smith/phylosmith@cb2d673)
-##  pillar                 1.7.0      2022-02-01 [1] CRAN (R 4.1.2)
-##  pkgbuild               1.3.1      2021-12-20 [1] CRAN (R 4.1.0)
+##  pillar                 1.8.1      2022-08-19 [1] CRAN (R 4.1.2)
+##  pkgbuild               1.4.0      2022-11-27 [1] CRAN (R 4.1.2)
 ##  pkgconfig              2.0.3      2019-09-22 [1] CRAN (R 4.1.0)
-##  pkgload                1.2.4      2021-11-30 [1] CRAN (R 4.1.0)
-##  plyr                   1.8.7      2022-03-24 [1] CRAN (R 4.1.2)
-##  polyclip               1.10-0     2019-03-14 [1] CRAN (R 4.1.0)
+##  pkgload                1.3.2      2022-11-16 [1] CRAN (R 4.1.2)
+##  plyr                   1.8.8      2022-11-11 [1] CRAN (R 4.1.2)
+##  polyclip               1.10-4     2022-10-20 [1] CRAN (R 4.1.2)
 ##  prettyunits            1.1.1      2020-01-24 [1] CRAN (R 4.1.0)
-##  processx               3.5.3      2022-03-25 [1] CRAN (R 4.1.2)
+##  processx               3.8.0      2022-10-26 [1] CRAN (R 4.1.2)
+##  profvis                0.3.7      2020-11-02 [1] CRAN (R 4.1.0)
 ##  promises               1.2.0.1    2021-02-11 [1] CRAN (R 4.1.0)
-##  proxy                  0.4-26     2021-06-07 [1] CRAN (R 4.1.0)
-##  ps                     1.6.0      2021-02-28 [1] CRAN (R 4.1.0)
-##  purrr                * 0.3.4      2020-04-17 [1] CRAN (R 4.1.2)
-##  questionr              0.7.7      2022-01-31 [1] CRAN (R 4.1.2)
+##  proxy                  0.4-27     2022-06-09 [1] CRAN (R 4.1.2)
+##  ps                     1.7.2      2022-10-26 [1] CRAN (R 4.1.2)
+##  purrr                * 1.0.1      2023-01-10 [1] CRAN (R 4.1.2)
+##  questionr              0.7.8      2023-01-31 [1] CRAN (R 4.1.2)
 ##  R6                     2.5.1      2021-08-19 [1] CRAN (R 4.1.0)
-##  rbibutils              2.2.7      2021-12-07 [1] CRAN (R 4.1.0)
-##  RColorBrewer           1.1-2      2014-12-07 [1] CRAN (R 4.1.0)
-##  Rcpp                   1.0.8.3    2022-03-17 [1] CRAN (R 4.1.2)
+##  ragg                   1.2.5      2023-01-12 [1] CRAN (R 4.1.2)
+##  rbibutils              2.2.13     2023-01-13 [1] CRAN (R 4.1.2)
+##  RColorBrewer           1.1-3      2022-04-03 [1] CRAN (R 4.1.2)
+##  Rcpp                   1.0.10     2023-01-22 [1] CRAN (R 4.1.2)
 ##  RcppParallel           5.1.6      2023-01-09 [1] CRAN (R 4.1.2)
-##  RCurl                  1.98-1.6   2022-02-08 [1] CRAN (R 4.1.2)
-##  Rdpack                 2.3        2022-03-23 [1] CRAN (R 4.1.2)
-##  readr                * 2.1.2      2022-01-30 [1] CRAN (R 4.1.2)
-##  readxl               * 1.4.0      2022-03-28 [1] CRAN (R 4.1.3)
+##  RCurl                  1.98-1.10  2023-01-27 [1] CRAN (R 4.1.2)
+##  Rdpack                 2.4        2022-07-20 [1] CRAN (R 4.1.2)
+##  readr                * 2.1.4      2023-02-10 [1] CRAN (R 4.1.2)
+##  readxl               * 1.4.2      2023-02-09 [1] CRAN (R 4.1.2)
 ##  remotes                2.4.2      2021-11-30 [1] CRAN (R 4.1.0)
-##  reprex                 2.0.1      2021-08-05 [1] CRAN (R 4.1.0)
 ##  reshape2               1.4.4      2020-04-09 [1] CRAN (R 4.1.0)
 ##  rhdf5                  2.38.1     2022-03-10 [1] Bioconductor
 ##  rhdf5filters           1.6.0      2021-10-26 [1] Bioconductor
 ##  Rhdf5lib               1.16.0     2021-10-26 [1] Bioconductor
 ##  rlang                  1.0.6      2022-09-24 [1] CRAN (R 4.1.2)
-##  rmarkdown              2.13       2022-03-10 [1] CRAN (R 4.1.2)
-##  rprojroot              2.0.2      2020-11-15 [1] CRAN (R 4.1.0)
-##  rstatix                0.7.0      2021-02-13 [1] CRAN (R 4.1.0)
-##  rstudioapi             0.13       2020-11-12 [1] CRAN (R 4.1.0)
-##  Rtsne                  0.15       2018-11-10 [1] CRAN (R 4.1.0)
-##  rvest                  1.0.2      2021-10-16 [1] CRAN (R 4.1.0)
+##  rmarkdown              2.20       2023-01-19 [1] CRAN (R 4.1.2)
+##  rstatix                0.7.2      2023-02-01 [1] CRAN (R 4.1.2)
+##  rstudioapi             0.14       2022-08-22 [1] CRAN (R 4.1.2)
+##  Rtsne                  0.16       2022-04-17 [1] CRAN (R 4.1.2)
 ##  S4Vectors              0.32.4     2022-03-24 [1] Bioconductor
-##  sandwich               3.0-1      2021-05-18 [1] CRAN (R 4.1.0)
-##  sass                   0.4.1      2022-03-23 [1] CRAN (R 4.1.2)
+##  sandwich               3.0-2      2022-06-15 [1] CRAN (R 4.1.2)
+##  sass                   0.4.5      2023-01-24 [1] CRAN (R 4.1.2)
 ##  scales                 1.2.1      2022-08-20 [1] CRAN (R 4.1.2)
 ##  sessioninfo            1.2.2      2021-12-06 [1] CRAN (R 4.1.0)
-##  sf                     1.0-7      2022-03-07 [1] CRAN (R 4.1.2)
-##  shiny                  1.7.1      2021-10-02 [1] CRAN (R 4.1.0)
-##  stringi                1.7.6      2021-11-29 [1] CRAN (R 4.1.0)
-##  stringr              * 1.4.0      2019-02-10 [1] CRAN (R 4.1.0)
+##  sf                     1.0-9      2022-11-08 [1] CRAN (R 4.1.2)
+##  shiny                  1.7.4      2022-12-15 [1] CRAN (R 4.1.2)
+##  stringi                1.7.12     2023-01-11 [1] CRAN (R 4.1.2)
+##  stringr              * 1.5.0      2022-12-02 [1] CRAN (R 4.1.2)
 ##  SummarizedExperiment   1.24.0     2021-10-26 [1] Bioconductor
-##  survival               3.3-1      2022-03-03 [1] CRAN (R 4.1.2)
-##  testthat               3.1.3      2022-03-29 [1] CRAN (R 4.1.3)
-##  TH.data                1.1-0      2021-09-27 [1] CRAN (R 4.1.0)
-##  tibble               * 3.1.6      2021-11-07 [1] CRAN (R 4.1.0)
-##  tidygraph              1.2.1      2022-04-05 [1] CRAN (R 4.1.2)
-##  tidyr                * 1.2.0      2022-02-01 [1] CRAN (R 4.1.2)
-##  tidyselect             1.1.2      2022-02-21 [1] CRAN (R 4.1.2)
-##  tidytree               0.3.9      2022-03-04 [1] CRAN (R 4.1.2)
-##  tidyverse            * 1.3.1      2021-04-15 [1] CRAN (R 4.1.0)
+##  survival               3.5-3      2023-02-12 [1] CRAN (R 4.1.2)
+##  systemfonts            1.0.4      2022-02-11 [1] CRAN (R 4.1.2)
+##  textshaping            0.3.6      2021-10-13 [1] CRAN (R 4.1.0)
+##  TH.data                1.1-1      2022-04-26 [1] CRAN (R 4.1.2)
+##  tibble               * 3.1.8      2022-07-22 [1] CRAN (R 4.1.2)
+##  tidygraph              1.2.3      2023-02-01 [1] CRAN (R 4.1.2)
+##  tidyr                * 1.3.0      2023-01-24 [1] CRAN (R 4.1.2)
+##  tidyselect             1.2.0      2022-10-10 [1] CRAN (R 4.1.2)
+##  tidytree               0.4.2      2022-12-18 [1] CRAN (R 4.1.2)
+##  tidyverse            * 2.0.0      2023-02-22 [1] CRAN (R 4.1.3)
+##  timechange             0.2.0      2023-01-11 [1] CRAN (R 4.1.2)
 ##  treeio                 1.18.1     2021-11-14 [1] Bioconductor
-##  tweenr                 1.0.2      2021-03-23 [1] CRAN (R 4.1.0)
+##  tweenr                 2.0.2      2022-09-06 [1] CRAN (R 4.1.2)
 ##  tzdb                   0.3.0      2022-03-28 [1] CRAN (R 4.1.3)
-##  units                  0.8-0      2022-02-05 [1] CRAN (R 4.1.2)
+##  units                  0.8-1      2022-12-10 [1] CRAN (R 4.1.2)
 ##  UpSetR               * 1.4.0      2019-05-22 [1] CRAN (R 4.1.0)
-##  usethis              * 2.1.5      2021-12-09 [1] CRAN (R 4.1.0)
-##  utf8                   1.2.2      2021-07-24 [1] CRAN (R 4.1.0)
-##  vctrs                  0.5.1      2022-11-16 [1] CRAN (R 4.1.2)
-##  vegan                * 2.5-7      2020-11-28 [1] CRAN (R 4.1.0)
+##  urlchecker             1.0.1      2021-11-30 [1] CRAN (R 4.1.0)
+##  usethis              * 2.1.6      2022-05-25 [1] CRAN (R 4.1.2)
+##  utf8                   1.2.3      2023-01-31 [1] CRAN (R 4.1.2)
+##  vctrs                  0.5.2      2023-01-23 [1] CRAN (R 4.1.2)
+##  vegan                * 2.6-4      2022-10-11 [1] CRAN (R 4.1.2)
 ##  VennDiagram          * 1.7.3      2022-04-12 [1] CRAN (R 4.1.2)
 ##  vipor                  0.4.5      2017-03-22 [1] CRAN (R 4.1.0)
 ##  viridis                0.6.2      2021-10-13 [1] CRAN (R 4.1.0)
-##  viridisLite            0.4.0      2021-04-13 [1] CRAN (R 4.1.0)
+##  viridisLite            0.4.1      2022-08-22 [1] CRAN (R 4.1.2)
 ##  withr                  2.5.0      2022-03-03 [1] CRAN (R 4.1.2)
-##  xfun                   0.30       2022-03-02 [1] CRAN (R 4.1.2)
-##  xml2                   1.3.3      2021-11-30 [1] CRAN (R 4.1.0)
+##  xfun                   0.37       2023-01-31 [1] CRAN (R 4.1.2)
 ##  xtable                 1.8-4      2019-04-21 [1] CRAN (R 4.1.0)
 ##  XVector                0.34.0     2021-10-26 [1] Bioconductor
-##  yaml                   2.3.5      2022-02-21 [1] CRAN (R 4.1.2)
-##  yulab.utils            0.0.4      2021-10-09 [1] CRAN (R 4.1.0)
-##  zip                    2.2.0      2021-05-31 [1] CRAN (R 4.1.0)
+##  yaml                   2.3.7      2023-01-23 [1] CRAN (R 4.1.2)
+##  yulab.utils            0.0.6      2022-12-20 [1] CRAN (R 4.1.2)
+##  zip                    2.2.2      2022-10-26 [1] CRAN (R 4.1.2)
 ##  zlibbioc               1.40.0     2021-10-26 [1] Bioconductor
-##  zoo                    1.8-9      2021-03-09 [1] CRAN (R 4.1.0)
+##  zoo                    1.8-11     2022-09-17 [1] CRAN (R 4.1.2)
 ## 
 ##  [1] /Library/Frameworks/R.framework/Versions/4.1/Resources/library
 ## 
