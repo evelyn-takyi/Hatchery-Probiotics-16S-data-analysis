@@ -1,0 +1,15 @@
+"","FeatureID","Taxa","Order","Genus","p.adj","Growth Rate","Percentage Survival"
+"1","ASV_1325","ASV_1325_BD7-11_BD7-11","o__BD7-11","BD7-11",0.0261683103637598,-0.521703567256943,-0.533579652076502
+"2","ASV_257","ASV_257_Gammaproteobacteria_Cocleimonas","o__Thiotrichales","Cocleimonas",0.00441906074024546,-0.6468192845918,-0.596548636548999
+"3","ASV_26","ASV_26_Gammaproteobacteria_Vibrio","o__Vibrionales","Vibrio",0.0136566513811651,0.754182577102268,0.552765262796358
+"4","ASV_263","ASV_263_OM190_OM190","o__OM190","OM190",0.0165704084375416,0.607330381936091,0.54347143725559
+"5","ASV_275","ASV_275_Gammaproteobacteria_Unknown","o__Vibrionales","Unknown",0.026675066404808,-0.560891005304403,-0.520600371168022
+"6","ASV_308","ASV_308_Bdellovibrionia_Peredibacter","o__Bacteriovoracales","Peredibacter",0.000819493477571282,-0.785038952547104,-0.662470923076333
+"7","ASV_321","ASV_321_Gammaproteobacteria_Rheinheimera","o__Alteromonadales","Rheinheimera",0.00650911856442598,-0.646355670184857,-0.583154508554852
+"8","ASV_353","ASV_353_Gammaproteobacteria_Unknown","Unknown","Unknown",0.00803500112763295,-0.574530394446472,-0.607833838780296
+"9","ASV_369","ASV_369_Alphaproteobacteria_Erythrobacter","o__Sphingomonadales","Erythrobacter",0.00229451983254796,-0.624329047968942,-0.653877915357987
+"10","ASV_505","ASV_505_Babeliae_Vermiphilaceae","o__Babeliales","Vermiphilaceae",0.0261683103637598,0.639870440578294,0.521862296364359
+"11","ASV_506","ASV_506_Gracilibacteria_JGI_0000069-P22","o__JGI_0000069-P22","JGI_0000069-P22",0.00767532551046585,-0.577158552460431,-0.610739569047368
+"12","ASV_554","ASV_554_Gammaproteobacteria_Alishewanella","o__Alteromonadales","Alishewanella",0.00219434663859477,-0.626672573720706,-0.662473625364591
+"13","ASV_751","ASV_751_Polyangia_Haliangium","o__Haliangiales","Haliangium",0.00598866118579655,-0.586159990186934,-0.609534469711834
+"14","ASV_959","ASV_959_Gammaproteobacteria_Pseudomonas","o__Pseudomonadales","Pseudomonas",0.00593657643926104,-0.587113899538366,-0.623495793951311

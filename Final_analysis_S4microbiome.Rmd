@@ -164,7 +164,7 @@ Order_abundances <- justbacteria_12000_rarefy %>% tax_glom(taxrank = "Order") %>
   write.csv( Order_abundances, "Tables/order.csv")
    
    # start plotting
-   Order_abundances %>% ggplot() +
+Order_abundances %>% ggplot() +
    geom_col(aes(x = Num, y = sum_abun, fill = OrderOther), position="fill")+
    labs(y="Percent Order Abundance", x=NULL, fill="Order") +
    facet_nested(.~Hatchery+Name+Treatment, scales = "free", space="free", switch="x") +
@@ -846,6 +846,83 @@ pairwiseAdonis::pairwise.adonis2(ASV_NUV_UV ~Type, data=Meta_NUV_UV, by=NULL,met
 
 ```
 
+# Figure 7 - Correlation analysis
+
+```{r correlation, fig.width=10}
+
+# import metadata table
+Performance_data <-read.xlsx("Data.xlsx", sheet="performance_data", rowNames = TRUE) 
+
+# select samples for correlation analysis
+ASV_corr <- subset_samples(justbacteria_12000_rarefy, Trial %in% c("T1","T2","T3","T4","T6","T7")) %>%
+   psmelt() %>% arrange(OTU) %>% 
+   group_by(Num,Treatment,Name,Hatchery,OTU) %>% 
+   summarise(avg_abundance = mean(Abundance)) %>%  # average by tank
+   spread(OTU,avg_abundance) 
+
+# perform correlation analysis with survival and growth rate data
+correlation.table <- associate(data.frame(Performance_data$Percentage_Survival,
+                                             Performance_data$Growth_rate_mm),
+                               ASV_corr[5:2503],
+                               method = "spearman", mode = "table", 
+                               p.adj.threshold = 0.05, n.signif = 1)
+names(correlation.table)[2]<-paste("FeatureID")
+
+# clean up correlation table ASV names
+correlation.table.edit <- correlation.table %>% 
+   left_join(as.data.frame(phyloseq::tax_table(justbacteria_12000_rarefy)) %>%
+                rownames_to_column("FeatureID")) %>% 
+   mutate(Class=str_remove(Class, "c__"),
+          Genus=str_remove(Genus, "g__"),
+          Taxa=paste(FeatureID, Class, Genus, sep="_")) %>% 
+   # filter correlation coefficients greater than 0.5
+   filter(abs(Correlation)>0.5) %>% 
+   # rename X1 to correlation metadata fields
+   mutate(performance = case_when(X1 == "Performance_data.Growth_rate_mm" ~ "Growth Rate",
+                       X1 == "Performance_data.Percentage_Survival" ~ "Percentage Survival")) %>% 
+   select(performance, FeatureID, Taxa, Order, Genus, Correlation, p.adj)
+
+# write table
+write.csv(correlation.table.edit, "Tables/Performance_CorrelationASVs.csv")
+
+# find taxa that are correlated with both metrics
+correlation.table.edit %>% ungroup() %>% 
+   spread(performance, Correlation) %>% 
+   group_by(FeatureID) %>% 
+   fill(`Growth Rate`,`Percentage Survival`) %>% 
+   drop_na() -> correlated.common 
+write.csv(correlated.common, "Tables/Performance_CorrelationASVs_common.csv")
+
+correlation.table.edit  %>% 
+   # filter only positive correlations
+   filter(FeatureID %in% correlated.common$FeatureID) %>% 
+   # start plotting
+   ggplot(aes(x = performance, y = reorder(Taxa,Correlation), fill = Correlation))+
+   geom_tile(color="white")+
+   scale_fill_gradientn("Correlation",
+                       breaks = seq(from = -1, to = 1, by = 0.2),
+                   colours = c("deeppink1", "deeppink4","white","turquoise4", "turquoise1"), 
+                   limits = c(-1,1))+
+   theme(axis.text.x=element_text(angle = 90))+
+   labs(x="Larval Performance", y=NULL) +
+   theme(axis.text.y = element_text(size="18", color="black",face="bold"), 
+         axis.title.y = element_text(face="bold",size="14", color="black"),
+         axis.text.x = element_text(size="18", color="black",face="bold", hjust=1), 
+         axis.title.x.bottom = element_text(face="bold",size="14", color="black"),
+         axis.text.x.top= element_text(face="bold",size="12", color="black"),
+         plot.title=element_text(size = 16, face = "bold", hjust = 0.5),
+         legend.text = element_text(size="14", color="black"),
+         legend.title = element_text(size="18", color="black",face="bold"),
+         legend.key.height = unit(2, "cm"))
+
+ggsave("Figures/Figure7.png", width=12, height=8, dpi=400)
+
+
+```
+
+
+
+
 # Figure S1 - Rarefaction curves
 
 ## All data
@@ -856,9 +933,11 @@ pairwiseAdonis::pairwise.adonis2(ASV_NUV_UV ~Type, data=Meta_NUV_UV, by=NULL,met
 # smallest number of reads in a sample
 (raremax <- min(rowSums(t(otu_table(justbacteria)))))
 # rarefied number of taxa per sample
-Srare <- vegan::rarefy(t(otu_table(justbacteria)), raremax)
-# slope at the end of the rarefacetion curve per sample
-Sslope <- vegan::rareslope(t(otu_table(justbacteria)), raremax)
+tab <- t(otu_table(justbacteria))
+class(tab) <- "matrix" # as.matrix() will do nothing
+Srare <- vegan::rarefy(tab, raremax)
+# slope at the end of the rarefaction curve per sample
+Sslope <- vegan::rareslope(tab, raremax)
 
 # plot observed vs rarefied number of ASVs
 plot(S, Srare, xlab = "Observed No. of ASVs", ylab = "Rarefied No. of ASVs")
@@ -867,7 +946,7 @@ abline(0,1)
 plot(S, Sslope, xlab = "Observed No. of ASVs", ylab = "Slope at rarefied sample size")
 
 # store rarefaction curves data with 100 steps
-rarecurve_data <- rarecurve(t(otu_table(justbacteria)), step = 100, sample = raremax)
+rarecurve_data <- rarecurve(tab, step = 100, sample = raremax)
 
 # clean plot of rarefaction curves
 rarecurvealldata <- map_dfr(rarecurve_data, bind_rows) %>%
@@ -898,9 +977,11 @@ rarecurvealldata
 # smallest number of reads in a sample
 (raremax <- min(rowSums(t(otu_table(justbacteria_12000_rarefy)))))
 # rarefied number of taxa per sample
-Srare <- vegan::rarefy(t(otu_table(justbacteria_12000_rarefy)), raremax)
-# slope at the end of the rarefacetion curve per sample
-Sslope <- vegan::rareslope(t(otu_table(justbacteria_12000_rarefy)), raremax)
+tab <- t(otu_table(justbacteria_12000_rarefy))
+class(tab) <- "matrix" # as.matrix() will do nothing
+Srare <- vegan::rarefy(tab, raremax)
+# slope at the end of the rarefaction curve per sample
+Sslope <- vegan::rareslope(tab, raremax)
 
 # plot observed vs rarefied number of ASVs
 plot(S, Srare, xlab = "Observed No. of ASVs", ylab = "Rarefied No. of ASVs")
@@ -909,7 +990,7 @@ abline(0,1)
 plot(S, Sslope, xlab = "Observed No. of ASVs", ylab = "Slope at rarefied sample size")
 
 # store rarefaction curves data with 100 steps
-rarecurve_data <- rarecurve(t(otu_table(justbacteria_12000_rarefy)), step = 100, sample = raremax)
+rarecurve_data <- rarecurve(tab, step = 100, sample = raremax)
 
 # clean plot of rarefaction curves
 rarecurveraredata <- map_dfr(rarecurve_data, bind_rows) %>% 
